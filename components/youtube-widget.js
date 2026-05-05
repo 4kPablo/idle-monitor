@@ -1,9 +1,9 @@
 "use client"
 
 import React, { useState } from "react"
-import { Youtube, Search, Paste, X, ClipboardPaste, Play, Pause, Monitor, Volume2 } from "lucide-react"
+import { Youtube, Search, X, Play, Pause, Monitor, Volume2 } from "lucide-react"
 
-const YoutubeWidget = ({ videoId, setVideoId, isVideoBackground, setIsVideoBackground }) => {
+const YoutubeWidget = ({ videoId, setVideoId, isVideoBackground, setIsVideoBackground, isFullscreenViewport, setIsFullscreenViewport }) => {
     const [url, setUrl] = useState("")
     const [isPlaying, setIsPlaying] = useState(true)
 
@@ -48,19 +48,7 @@ const YoutubeWidget = ({ videoId, setVideoId, isVideoBackground, setIsVideoBackg
         }
     }
 
-    const handlePaste = async () => {
-        try {
-            const text = await navigator.clipboard.readText()
-            const id = extractVideoId(text)
-            if (id && setVideoId) {
-                setVideoId(id)
-                setUrl("")
-            }
-        } catch (err) {
-            console.error("No se pudo leer el portapapeles: ", err)
-            alert("El navegador no permitió leer el portapapeles. Usa Ctrl+V para pegar manualmente.")
-        }
-    }
+
 
     return (
         <div className="space-y-3 h-full flex flex-col">
@@ -74,23 +62,23 @@ const YoutubeWidget = ({ videoId, setVideoId, isVideoBackground, setIsVideoBackg
                         {isVideoBackground ? "Reproduciendo en segundo plano" : "Reproduciendo en primer plano"}
                     </p>
                     <div className="flex gap-2 w-full mt-auto">
-                       <button onClick={togglePlay} className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 py-1.5 rounded-md flex items-center justify-center transition-colors">
+                       <button onClick={togglePlay} className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 py-1.5 rounded-md flex items-center justify-center transition-colors" title={isPlaying ? "Pausar" : "Reproducir"}>
                            {isPlaying ? <Pause className="w-4 h-4"/> : <Play className="w-4 h-4 ml-0.5"/>}
                        </button>
-                       <button onClick={() => setIsVideoBackground(!isVideoBackground)} className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/80 py-1.5 rounded-md flex items-center justify-center transition-colors" title="Alternar segundo plano">
+                       <button onClick={() => setIsVideoBackground(!isVideoBackground)} className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/80 py-1.5 rounded-md flex items-center justify-center transition-colors" title={isVideoBackground ? "Volver a primer plano" : "Reproducir en segundo plano"}>
                            {isVideoBackground ? <Monitor className="w-4 h-4"/> : <Volume2 className="w-4 h-4"/>}
                        </button>
+                       <button onClick={() => {if(setIsFullscreenViewport) setIsFullscreenViewport(!isFullscreenViewport)}} className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/80 py-1.5 rounded-md flex items-center justify-center transition-colors" title="Pantalla completa en ventana">
+                           <Monitor className="w-4 h-4"/>
+                       </button>
+                       <button onClick={() => { setVideoId(""); setIsVideoBackground(false); if(setIsFullscreenViewport) setIsFullscreenViewport(false); }} className="flex-1 bg-destructive/10 text-destructive hover:bg-destructive/20 py-1.5 rounded-md flex items-center justify-center transition-colors" title="Cerrar video">
+                           <X className="w-4 h-4" />
+                       </button>
                     </div>
-                    <button
-                        onClick={() => { setVideoId(""); setIsVideoBackground(false); }}
-                        className="text-xs bg-destructive/10 text-destructive hover:bg-destructive/20 w-full py-1.5 rounded-md flex items-center justify-center gap-1 transition-colors mt-1 font-medium"
-                    >
-                        <X className="w-3 h-3" /> Cerrar video
-                    </button>
                 </div>
             ) : (
                 <form onSubmit={handleSubmit} className="flex flex-col gap-2 flex-grow justify-center py-2">
-                    <p className="text-xs text-muted-foreground">Pega un enlace para ver:</p>
+
                     <div className="flex flex-col gap-2">
                         <input
                             type="text"
@@ -102,9 +90,6 @@ const YoutubeWidget = ({ videoId, setVideoId, isVideoBackground, setIsVideoBackg
                         <div className="flex gap-2">
                             <button type="submit" className="flex-1 bg-primary/10 text-primary hover:bg-primary/20 rounded px-2 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1">
                                 <Search className="w-3 h-3" /> Buscar
-                            </button>
-                            <button type="button" onClick={handlePaste} className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded px-2 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1" title="Pegar desde portapapeles">
-                                <ClipboardPaste className="w-3 h-3" /> Pegar
                             </button>
                         </div>
                     </div>

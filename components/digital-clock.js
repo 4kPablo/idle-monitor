@@ -1,37 +1,49 @@
 "use client"
 
 import React, { useState, useEffect, useRef } from "react"
-import { Clock, AlarmClock, Timer, TimerReset, Play, Pause, RotateCcw } from "lucide-react"
+import { Clock, AlarmClock, Timer, TimerReset, Play, Pause, RotateCcw, Check } from "lucide-react"
+import { toast } from "sonner"
+import AnalogClock from "./analog-clock"
+import { playAlarmSound } from "./hourly-chime"
+import TimePicker from "./shadcn-studio/date-picker/date-picker-09"
 
-export default function DigitalClockWidget({ time, showSeconds }) {
+export default function DigitalClockWidget({ time, showSeconds = true, clockStyle = "digital", alarmSoundType = "beep", timerSoundType = "beep" }) {
     const [mode, setMode] = useState("clock") // clock, alarm, timer, stopwatch
 
-    const [alarmTime, setAlarmTime] = useState("")
+    const [alarmTime, setAlarmTime] = useState("00:00")
     const [alarmActive, setAlarmActive] = useState(false)
 
     const [timerSeconds, setTimerSeconds] = useState(5 * 60)
     const [timerActive, setTimerActive] = useState(false)
     const [inputMinutes, setInputMinutes] = useState(5)
+    const [inputSeconds, setInputSeconds] = useState(0)
 
     const [stopwatchSeconds, setStopwatchSeconds] = useState(0)
     const [stopwatchActive, setStopwatchActive] = useState(false)
 
     const timerRef = useRef(null)
+    const alarmIntervalRef = useRef(null)
 
-    const playSound = () => {
+    const triggerAlarm = (soundType) => {
         try {
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-            const oscillator = audioContext.createOscillator()
-            const gainNode = audioContext.createGain()
-            oscillator.connect(gainNode)
-            gainNode.connect(audioContext.destination)
-            oscillator.frequency.setValueAtTime(880, audioContext.currentTime)
-            oscillator.frequency.exponentialRampToValueAtTime(440, audioContext.currentTime + 0.5)
-            oscillator.type = "sine"
-            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1)
-            oscillator.start(audioContext.currentTime)
-            oscillator.stop(audioContext.currentTime + 1)
+            if (alarmIntervalRef.current) clearInterval(alarmIntervalRef.current)
+            playAlarmSound(soundType)
+            alarmIntervalRef.current = setInterval(() => playAlarmSound(soundType), 2000)
+
+            toast("¡Tiempo completado!", {
+                id: "alarm-toast",
+                duration: Infinity,
+                action: {
+                    label: "Apagar Alarma",
+                    onClick: () => {
+                        if (alarmIntervalRef.current) {
+                            clearInterval(alarmIntervalRef.current)
+                            alarmIntervalRef.current = null
+                        }
+                        toast.dismiss("alarm-toast")
+                    }
+                }
+            })
         } catch (e) { }
     }
 
@@ -39,18 +51,18 @@ export default function DigitalClockWidget({ time, showSeconds }) {
         if (alarmActive && alarmTime) {
             const currentFormatted = `${time.getHours().toString().padStart(2, "0")}:${time.getMinutes().toString().padStart(2, "0")}`
             if (currentFormatted === alarmTime && time.getSeconds() === 0) {
-                playSound()
+                triggerAlarm(alarmSoundType)
                 setAlarmActive(false)
             }
         }
-    }, [time, alarmActive, alarmTime])
+    }, [time, alarmActive, alarmTime, alarmSoundType])
 
     useEffect(() => {
         if (timerActive) {
             timerRef.current = setInterval(() => {
                 setTimerSeconds(prev => {
                     if (prev <= 1) {
-                        playSound()
+                        triggerAlarm(timerSoundType)
                         setTimerActive(false)
                         return 0
                     }
@@ -58,13 +70,10 @@ export default function DigitalClockWidget({ time, showSeconds }) {
                 })
             }, 1000)
         } else if (stopwatchActive) {
-            timerRef.current = setInterval(() => {
-                setStopwatchSeconds(prev => prev + 1)
-            }, 1000)
+            timerRef.current = setInterval(() => setStopwatchSeconds(prev => prev + 1), 1000)
         }
-
         return () => clearInterval(timerRef.current)
-    }, [timerActive, stopwatchActive])
+    }, [timerActive, stopwatchActive, timerSoundType])
 
     const hours = time.getHours().toString().padStart(2, "0")
     const minutes = time.getMinutes().toString().padStart(2, "0")
@@ -76,34 +85,85 @@ export default function DigitalClockWidget({ time, showSeconds }) {
         return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`
     }
 
+    const updateTimerFromInputs = (mins, secs) => {
+        setTimerSeconds((parseInt(mins || 0) * 60) + parseInt(secs || 0))
+    }
+
+    // Timer value as HH:MM:SS duration string
+    const timerToValue = (mins, secs) => {
+        const h = Math.floor(mins / 60)
+        const m = mins % 60
+        return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(secs).padStart(2,'0')}`
+    }
+    const valueToTimer = (v) => {
+        const parts = (v || '00:00:00').split(':').map(Number)
+        const totalMins = (parts[0] || 0) * 60 + (parts[1] || 0)
+        const secs = parts[2] || 0
+        setInputMinutes(totalMins)
+        setInputSeconds(secs)
+        updateTimerFromInputs(totalMins, secs)
+    }
+
+    // Alarm time stepper helpers
+    const getAlarmParts = () => {
+        const [h, m] = (alarmTime || "00:00").split(":").map(Number)
+        return { h: isNaN(h) ? 0 : h, m: isNaN(m) ? 0 : m }
+    }
+    const setAlarmParts = (h, m) => {
+        const hh = String(Math.max(0, Math.min(23, h))).padStart(2, '0')
+        const mm = String(Math.max(0, Math.min(59, m))).padStart(2, '0')
+        setAlarmTime(`${hh}:${mm}`)
+    }
+
     const renderContent = () => {
         if (mode === "clock") {
+            if (clockStyle === "analog") {
+                return <AnalogClock time={time} hideSeconds={!showSeconds} className="w-full h-full" />
+            }
             return (
                 <div className="font-mono text-5xl font-bold tracking-tight text-primary drop-shadow-sm flex items-baseline">
                     {hours}:{minutes}
-                    {showSeconds && (
-                        <span className="text-2xl text-muted-foreground ml-1">:{seconds}</span>
-                    )}
+                    {showSeconds && <span className="text-2xl text-muted-foreground ml-1">:{seconds}</span>}
                 </div>
             )
         } else if (mode === "alarm") {
             return (
-                <div className="flex flex-col items-center gap-2">
-                    <input type="time" value={alarmTime} onChange={(e) => setAlarmTime(e.target.value)} className="bg-background border border-border rounded px-2 py-1 text-sm outline-none" disabled={alarmActive} />
-                    <button onClick={() => { if (alarmTime) setAlarmActive(!alarmActive) }} className={`px-4 py-1 rounded text-xs font-medium transition-colors ${alarmActive ? 'bg-destructive text-destructive-foreground' : 'bg-primary text-primary-foreground'}`}>
-                        {alarmActive ? 'Desactivar' : 'Activar Alarma'}
+                <div className="flex items-center gap-2">
+                    <TimePicker
+                        id="alarm-time-picker"
+                        value={alarmTime}
+                        onChange={(v) => setAlarmTime(v)}
+                        className="flex-1"
+                        label=""
+                    />
+                    <button
+                        onClick={() => { if (alarmTime) setAlarmActive(!alarmActive) }}
+                        className={`p-2 rounded-full transition-colors flex-shrink-0 ${alarmActive ? 'bg-destructive text-destructive-foreground' : 'bg-primary text-primary-foreground'}`}
+                        title={alarmActive ? 'Desactivar Alarma' : 'Activar Alarma'}
+                    >
+                        {alarmActive ? <AlarmClock className="w-4 h-4" /> : <Check className="w-4 h-4" />}
                     </button>
                 </div>
             )
         } else if (mode === "timer") {
-            const isInitial = !timerActive && timerSeconds === inputMinutes * 60;
+            const isInitial = !timerActive && timerSeconds === ((inputMinutes * 60) + parseInt(inputSeconds || 0))
             return (
-                <div className="flex flex-col items-center gap-2 w-full px-4">
+                <div className="flex flex-col items-center gap-2 w-full">
                     {isInitial || (!timerActive && timerSeconds === 0) ? (
                         <div className="flex items-center justify-center gap-2">
-                            <input type="number" value={inputMinutes} onChange={e => { setInputMinutes(e.target.value); setTimerSeconds(parseInt(e.target.value || 0) * 60); }} min="1" className="bg-background border border-border rounded px-2 py-1.5 text-lg font-mono w-20 text-center outline-none focus:border-primary" />
-                            <span className="text-sm text-muted-foreground font-medium">min</span>
-                            <button onClick={() => { setTimerSeconds(parseInt(inputMinutes || 1) * 60); setTimerActive(true); }} className="p-2 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 ml-1"><Play className="w-4 h-4 ml-0.5" /></button>
+                            <TimePicker
+                                id="timer-duration-picker"
+                                value={timerToValue(inputMinutes, inputSeconds)}
+                                onChange={valueToTimer}
+                                showSeconds={true}
+                                label=""
+                            />
+                            <button
+                                onClick={() => { updateTimerFromInputs(inputMinutes, inputSeconds); if (inputMinutes || inputSeconds) setTimerActive(true) }}
+                                className="p-2 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 flex-shrink-0"
+                            >
+                                <Play className="w-4 h-4 ml-0.5" />
+                            </button>
                         </div>
                     ) : (
                         <>
@@ -112,7 +172,7 @@ export default function DigitalClockWidget({ time, showSeconds }) {
                                 <button onClick={() => setTimerActive(!timerActive)} className="p-2 bg-primary/10 text-primary rounded-full hover:bg-primary/20">
                                     {timerActive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
                                 </button>
-                                <button onClick={() => { setTimerActive(false); setTimerSeconds(parseInt(inputMinutes || 1) * 60) }} className="p-2 bg-secondary text-muted-foreground rounded-full hover:bg-secondary/80">
+                                <button onClick={() => { setTimerActive(false); updateTimerFromInputs(inputMinutes, inputSeconds) }} className="p-2 bg-secondary text-muted-foreground rounded-full hover:bg-secondary/80">
                                     <RotateCcw className="w-4 h-4" />
                                 </button>
                             </div>
@@ -145,7 +205,7 @@ export default function DigitalClockWidget({ time, showSeconds }) {
                     {mode === "alarm" && <AlarmClock className="w-4 h-4" />}
                     {mode === "timer" && <Timer className="w-4 h-4" />}
                     {mode === "stopwatch" && <TimerReset className="w-4 h-4" />}
-                    <span className="capitalize hidden sm:inline">{mode === 'clock' ? 'Reloj Digital' : mode === 'stopwatch' ? 'Cronómetro' : mode}</span>
+                    <span className="capitalize hidden sm:inline">{mode === 'clock' ? 'Reloj' : mode === 'stopwatch' ? 'Cronómetro' : mode}</span>
                 </h3>
                 <div className="flex gap-1 bg-secondary/30 rounded p-0.5 ml-auto">
                     <button onClick={() => setMode('clock')} className={`p-1 rounded transition-colors ${mode === 'clock' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}><Clock className="w-3 h-3" /></button>
@@ -154,7 +214,7 @@ export default function DigitalClockWidget({ time, showSeconds }) {
                     <button onClick={() => setMode('stopwatch')} className={`p-1 rounded transition-colors ${mode === 'stopwatch' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}><TimerReset className="w-3 h-3" /></button>
                 </div>
             </div>
-            <div className="flex-grow flex items-center justify-center w-full aspect-video bg-accent/5 rounded-xl h-22">
+            <div className={`flex-grow flex items-center justify-center w-full transition-all duration-500 rounded-xl ${clockStyle === 'analog' ? 'aspect-square' : 'aspect-video h-22 bg-accent/5'}`}>
                 {renderContent()}
             </div>
         </div>

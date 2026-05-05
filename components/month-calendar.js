@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { getPomodorosForMonth, getPomodorosForDay, savePomodoroLog } from "@/lib/pomodoro-store"
-import { BookOpen, Dumbbell, Pencil, X, Plus } from "lucide-react"
+import { getPomodorosForMonth, getPomodorosForDay, savePomodoroLog, deletePomodoroLog } from "@/lib/pomodoro-store"
+import { BookOpen, Dumbbell, Pencil, X, Plus, Trash2 } from "lucide-react"
 
 const activityIcons = {
   study: { icon: BookOpen, color: "oklch(0.70 0.15 250)", label: "Estudiar" },
@@ -194,10 +194,20 @@ export default function MonthCalendar({ currentDate, pomodoroRefresh }) {
               const activity = activityIcons[p.activity]
               const Icon = activity?.icon
               return (
-                <div key={p.id} className="flex items-center gap-2 text-xs">
+                <div key={p.id} className="flex items-center gap-2 text-xs group">
                   {Icon && <Icon className="w-3 h-3" style={{ color: activity.color }} />}
                   <span>{activity?.label}</span>
                   <span className="text-muted-foreground ml-auto">{p.duration} min</span>
+                  <button 
+                    onClick={() => {
+                      deletePomodoroLog(p.id);
+                      setLocalRefresh(l => l + 1);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity ml-1"
+                    title="Eliminar actividad"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
                 </div>
               )
             })}
