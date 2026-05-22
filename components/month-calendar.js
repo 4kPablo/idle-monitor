@@ -147,16 +147,17 @@ export default function MonthCalendar({ currentDate, pomodoroRefresh }) {
               type="button"
               key={index}
               onClick={() => {
-                if (hasPomodoros) {
+                if (day !== null) {
                   setSelectedDay(day)
                   setDayPomodoros(getPomodorosForDay(year, month, day))
+                  setManualDate(`${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`)
                 }
               }}
               className={`
                 w-7 h-7 flex flex-col items-center justify-center text-xs rounded-md
                 transition-all duration-200 relative
                 ${day === null ? "invisible" : ""}
-                ${hasPomodoros ? "cursor-pointer hover:bg-secondary/50" : "cursor-default"}
+                ${day !== null ? "cursor-pointer hover:bg-secondary/50" : "cursor-default"}
                 ${
                   day === today && isCurrentMonth
                     ? "bg-primary text-primary-foreground font-bold"
@@ -212,46 +213,42 @@ export default function MonthCalendar({ currentDate, pomodoroRefresh }) {
               )
             })}
           </div>
+          <div className="mt-4 border-t border-border/50 pt-4">
+             <button onClick={() => setShowManualEntry(!showManualEntry)} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+                 <Plus className="w-3 h-3"/> Registrar actividad manual
+             </button>
+             {showManualEntry && (
+                 <form onSubmit={(e) => {
+                     e.preventDefault();
+                     if (manualDuration && !isNaN(manualDuration)) {
+                         const dateParts = manualDate.split("-");
+                         const date = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+                         savePomodoroLog(manualActivity, parseInt(manualDuration), date);
+                         setLocalRefresh(l => l + 1);
+                         setDayPomodoros(getPomodorosForDay(year, month, selectedDay));
+                         setShowManualEntry(false);
+                     }
+                 }} className="mt-3 space-y-3 bg-background/50 p-3 rounded-xl text-xs animate-in fade-in slide-in-from-top-2 border border-border/50">
+                     <div className="flex flex-col gap-1.5">
+                         <label className="text-muted-foreground font-medium">Actividad</label>
+                         <select value={manualActivity} onChange={e => setManualActivity(e.target.value)} className="bg-background border border-border rounded-md px-2 py-1.5 outline-none focus:border-primary">
+                             <option value="study">Estudiar</option>
+                             <option value="exercise">Ejercitar</option>
+                             <option value="draw">Dibujar</option>
+                         </select>
+                     </div>
+                     <div className="flex gap-3">
+                         <div className="flex flex-col gap-1.5 flex-1">
+                             <label className="text-muted-foreground font-medium">Minutos</label>
+                             <input type="number" value={manualDuration} onChange={e => setManualDuration(e.target.value)} className="bg-background border border-border rounded-md px-2 py-1.5 w-full outline-none focus:border-primary" required min="1"/>
+                         </div>
+                     </div>
+                     <button type="submit" className="w-full bg-primary text-primary-foreground rounded-md py-2 mt-1 font-medium hover:bg-primary/90 transition-colors">Guardar Registro</button>
+                 </form>
+             )}
+          </div>
         </div>
       )}
-
-      <div className="mt-4 border-t border-border pt-4">
-         <button onClick={() => setShowManualEntry(!showManualEntry)} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
-             <Plus className="w-3 h-3"/> Registrar actividad manual
-         </button>
-         {showManualEntry && (
-             <form onSubmit={(e) => {
-                 e.preventDefault();
-                 if (manualDuration && !isNaN(manualDuration)) {
-                     const dateParts = manualDate.split("-");
-                     const date = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
-                     savePomodoroLog(manualActivity, parseInt(manualDuration), date);
-                     setLocalRefresh(l => l + 1);
-                     setShowManualEntry(false);
-                 }
-             }} className="mt-3 space-y-3 bg-secondary/20 p-3 rounded-xl text-xs animate-in fade-in slide-in-from-top-2">
-                 <div className="flex flex-col gap-1.5">
-                     <label className="text-muted-foreground font-medium">Actividad</label>
-                     <select value={manualActivity} onChange={e => setManualActivity(e.target.value)} className="bg-background border border-border rounded-md px-2 py-1.5 outline-none focus:border-primary">
-                         <option value="study">Estudiar</option>
-                         <option value="exercise">Ejercitar</option>
-                         <option value="draw">Dibujar</option>
-                     </select>
-                 </div>
-                 <div className="flex gap-3">
-                     <div className="flex flex-col gap-1.5 flex-1">
-                         <label className="text-muted-foreground font-medium">Minutos</label>
-                         <input type="number" value={manualDuration} onChange={e => setManualDuration(e.target.value)} className="bg-background border border-border rounded-md px-2 py-1.5 w-full outline-none focus:border-primary" required min="1"/>
-                     </div>
-                     <div className="flex flex-col gap-1.5 flex-1">
-                         <label className="text-muted-foreground font-medium">Fecha</label>
-                         <input type="date" value={manualDate} onChange={e => setManualDate(e.target.value)} className="bg-background border border-border rounded-md px-2 py-1.5 w-full outline-none focus:border-primary" required/>
-                     </div>
-                 </div>
-                 <button type="submit" className="w-full bg-primary text-primary-foreground rounded-md py-2 mt-1 font-medium hover:bg-primary/90 transition-colors">Guardar Registro</button>
-             </form>
-         )}
-      </div>
     </div>
   )
 }

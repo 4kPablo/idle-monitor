@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
-import { Youtube, Search, X, Play, Pause, Monitor, Volume2, Bookmark, Save, Pencil, Trash2, GripVertical } from "lucide-react"
+import { Youtube, Search, X, Play, Pause, Bookmark, Save, Pencil, Trash2, GripVertical, Eye, EyeOff, Maximize, Volume2 } from "lucide-react"
 import { toast } from "sonner"
 import {
   DndContext,
@@ -23,6 +23,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { Slider } from "@/components/ui/slider"
 
 const SortableVideoItem = ({ video, onPlay, onRename, onDelete }) => {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: video.id })
@@ -102,10 +103,10 @@ const YoutubeWidget = ({ videoId, setVideoId, isVideoBackground, setIsVideoBackg
         }
     }
 
-    const sendCommand = (func) => {
+    const sendCommand = (func, args = []) => {
         const iframe = document.getElementById('main-youtube-frame')
         if (iframe && iframe.contentWindow) {
-            iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: func, args: [] }), '*')
+            iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: func, args: args }), '*')
         }
     }
 
@@ -235,19 +236,31 @@ const YoutubeWidget = ({ videoId, setVideoId, isVideoBackground, setIsVideoBackg
             <div className="flex-1 flex flex-col relative overflow-hidden">
                 {!youtubePlaylistExpanded ? (
                     videoId ? (
-                        <div className="flex-grow w-full flex flex-col gap-2 p-3 border border-border rounded-xl bg-secondary/20 h-full">
+                        <div className="flex-grow w-full flex flex-col gap-2 pt-2 h-full">
                             <p className="text-[10px] text-muted-foreground text-center font-medium">
                                 {isVideoBackground ? "Reproduciendo en segundo plano" : "Reproduciendo en primer plano"}
                             </p>
-                            <div className="flex gap-2 w-full mt-auto">
-                               <button onClick={togglePlay} className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 py-1.5 rounded-md flex items-center justify-center transition-colors" title={isPlaying ? "Pausar" : "Reproducir"}>
+                            
+                            <div className="flex items-center gap-3 px-2 mt-auto pb-2">
+                                <Volume2 className="w-3.5 h-3.5 text-muted-foreground" />
+                                <Slider 
+                                    defaultValue={[100]} 
+                                    max={100} 
+                                    step={1} 
+                                    onValueChange={(v) => sendCommand('setVolume', [v[0]])} 
+                                    className="flex-1 cursor-pointer"
+                                />
+                            </div>
+
+                            <div className="flex gap-2 w-full">
+                               <button onClick={togglePlay} className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/80 py-1.5 rounded-md flex items-center justify-center transition-colors" title={isPlaying ? "Pausar" : "Reproducir"}>
                                    {isPlaying ? <Pause className="w-4 h-4"/> : <Play className="w-4 h-4 ml-0.5"/>}
                                </button>
                                <button onClick={() => setIsVideoBackground(!isVideoBackground)} className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/80 py-1.5 rounded-md flex items-center justify-center transition-colors" title={isVideoBackground ? "Volver a primer plano" : "Reproducir en segundo plano"}>
-                                   {isVideoBackground ? <Monitor className="w-4 h-4"/> : <Volume2 className="w-4 h-4"/>}
+                                   {isVideoBackground ? <Eye className="w-4 h-4"/> : <EyeOff className="w-4 h-4"/>}
                                </button>
                                <button onClick={() => {if(setIsFullscreenViewport) setIsFullscreenViewport(!isFullscreenViewport)}} className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/80 py-1.5 rounded-md flex items-center justify-center transition-colors" title="Pantalla completa en ventana">
-                                   <Monitor className="w-4 h-4"/>
+                                   <Maximize className="w-4 h-4"/>
                                </button>
                                <button onClick={() => { setVideoId(""); setIsVideoBackground(false); if(setIsFullscreenViewport) setIsFullscreenViewport(false); }} className="flex-1 bg-destructive/10 text-destructive hover:bg-destructive/20 py-1.5 rounded-md flex items-center justify-center transition-colors" title="Cerrar video">
                                    <X className="w-4 h-4" />

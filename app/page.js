@@ -17,6 +17,7 @@ import HourlyChime from "@/components/hourly-chime"
 import DraggableWidget from "@/components/draggable-widget"
 import QuickLinks from "@/components/quick-links"
 import TaskList from "@/components/task-list"
+import AiNewsSummary from "@/components/ai-news-summary"
 import { getWidgetLayout, saveWidgetLayout, moveWidget } from "@/lib/widget-store"
 import { getSettings, saveSettings } from "@/lib/settings-store"
 import { Settings2, Check, Palette, X, Image as ImageIcon, ArrowLeft, Focus, Maximize, Minimize, Plus, Clock, Monitor, EyeOff, LayoutTemplate, Download, Upload, Bell, Play } from "lucide-react"
@@ -132,6 +133,7 @@ const widgetComponents = {
   }) },
   "quick-links": { component: QuickLinks, props: () => EMPTY_PROPS },
   "task-list": { component: TaskList, props: () => EMPTY_PROPS },
+  "ai-news": { component: AiNewsSummary, props: () => EMPTY_PROPS },
 }
 
 // Configuración de Temas por Fondo
@@ -1017,7 +1019,6 @@ export default function HomePage() {
                       title="YouTube video player"
                       frameBorder="0"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
                       className={isFullscreenViewport ? "w-full h-full" : "absolute inset-0 w-full h-full"}
                     ></iframe>
                   </div>

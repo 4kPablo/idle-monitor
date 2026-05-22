@@ -1,14 +1,16 @@
 "use client"
 
 import React, { useState, useEffect, useRef } from "react"
-import { ListTodo, Check, Plus, Trash2, Edit2, GripVertical, Bell, ChevronDown } from "lucide-react"
+import { ListTodo, Check, Plus, Trash2, Edit2, GripVertical, Bell, ChevronDown, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
 const TaskList = () => {
   const [tasks, setTasks] = useState([])
   const [newTask, setNewTask] = useState("")
-  const [newTaskReminder, setNewTaskReminder] = useState("")
+  const [newTaskReminderTime, setNewTaskReminderTime] = useState("")
+  const [newTaskReminderDate, setNewTaskReminderDate] = useState("")
+  const [showDatePicker, setShowDatePicker] = useState(false)
   const [showReminder, setShowReminder] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const timeoutsRef = useRef({})
@@ -53,15 +55,23 @@ const TaskList = () => {
 
   const addTask = () => {
     if (!newTask.trim()) return
+    let reminderDatetime = null;
+    if (newTaskReminderTime) {
+      const dateStr = newTaskReminderDate || new Date().toISOString().split('T')[0];
+      reminderDatetime = `${dateStr}T${newTaskReminderTime}`;
+    }
+
     const newTaskObj = {
       id: Date.now().toString(),
       title: newTask.trim(),
       completed: false,
-      reminderDatetime: newTaskReminder || null,
+      reminderDatetime: reminderDatetime,
     }
     saveTasks([...tasks, newTaskObj])
     setNewTask("")
-    setNewTaskReminder("")
+    setNewTaskReminderTime("")
+    setNewTaskReminderDate("")
+    setShowDatePicker(false)
     setShowReminder(false)
   }
 
@@ -118,56 +128,55 @@ const TaskList = () => {
         </Button>
       </div>
 
-      <div className="space-y-0.5 max-h-[280px] overflow-y-auto pr-1">
-        {tasks.map((task, index) => (
-          <div
-            key={task.id}
-            className={`flex items-start gap-2 px-1 py-1.5 rounded-lg transition-colors group ${task.completed ? "opacity-50" : ""} hover:bg-secondary/40`}
-            draggable={isEditing}
-            onDragStart={(e) => onDragStart(e, index)}
-            onDragOver={(e) => onDragOver(e, index)}
-            onDragEnd={onDragEnd}
-          >
-            {isEditing && (
-              <div className="mt-0.5 cursor-grab text-muted-foreground hover:text-foreground shrink-0">
-                <GripVertical className="w-4 h-4" />
-              </div>
-            )}
+      {tasks.length > 0 && (
+        <div className="space-y-0.5 max-h-[280px] overflow-y-auto pr-1">
+          {tasks.map((task, index) => (
+            <div
+              key={task.id}
+              className={`flex items-start gap-2 px-1 py-1.5 rounded-lg transition-colors group ${task.completed ? "opacity-50" : ""} hover:bg-secondary/40`}
+              draggable={isEditing}
+              onDragStart={(e) => onDragStart(e, index)}
+              onDragOver={(e) => onDragOver(e, index)}
+              onDragEnd={onDragEnd}
+            >
+              {isEditing && (
+                <div className="mt-0.5 cursor-grab text-muted-foreground hover:text-foreground shrink-0">
+                  <GripVertical className="w-4 h-4" />
+                </div>
+              )}
 
-            {!isEditing && (
-              <button
-                className={`w-3.5 h-3.5 mt-1 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${task.completed ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground hover:border-primary"}`}
-                onClick={() => toggleTask(task.id)}
-              >
-                {task.completed && <Check className="w-2.5 h-2.5" />}
-              </button>
-            )}
+              {!isEditing && (
+                <button
+                  className={`w-3.5 h-3.5 mt-1 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${task.completed ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground hover:border-primary"}`}
+                  onClick={() => toggleTask(task.id)}
+                >
+                  {task.completed && <Check className="w-2.5 h-2.5" />}
+                </button>
+              )}
 
-            <div className="flex-1 min-w-0">
-              <p className={`text-sm break-words transition-all leading-snug ${task.completed ? "line-through text-muted-foreground" : "text-foreground"}`}>
-                {task.title}
-              </p>
-              {task.reminderDatetime && (
-                <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5 font-mono">
-                  <Bell className="w-2.5 h-2.5 shrink-0" />
-                  {formatReminder(task.reminderDatetime)}
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm break-words transition-all leading-snug ${task.completed ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                  {task.title}
                 </p>
+                {task.reminderDatetime && (
+                  <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5 font-mono">
+                    <Bell className="w-2.5 h-2.5 shrink-0" />
+                    {formatReminder(task.reminderDatetime)}
+                  </p>
+                )}
+              </div>
+              {isEditing && (
+                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0" onClick={() => deleteTask(task.id)}>
+                  <Trash2 className="w-4 h-4" />
+                </Button>
               )}
             </div>
-            {isEditing && (
-              <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0" onClick={() => deleteTask(task.id)}>
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            )}
-          </div>
-        ))}
-        {tasks.length === 0 && (
-          <p className="text-xs text-muted-foreground py-2 text-center">No hay tareas pendientes</p>
-        )}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Add task row */}
-      <div className="pt-2 border-t border-border space-y-1.5">
+      <div className="pt-2 space-y-1.5">
         <div className="flex gap-2 items-center">
           <Input
             placeholder="Nueva tarea..."
@@ -191,13 +200,28 @@ const TaskList = () => {
         </button>
 
         {showReminder && (
-          <input
-            type="datetime-local"
-            className="w-full h-8 text-xs bg-secondary/40 border border-border rounded-md px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-            value={newTaskReminder}
-            onChange={(e) => setNewTaskReminder(e.target.value)}
-            style={{ colorScheme: "dark" }}
-          />
+          <div className="flex gap-2">
+            <input
+              type="time"
+              className="flex-1 h-8 text-xs bg-secondary/40 border border-border rounded-md px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              value={newTaskReminderTime}
+              onChange={(e) => setNewTaskReminderTime(e.target.value)}
+              style={{ colorScheme: "dark" }}
+            />
+            {showDatePicker ? (
+              <input
+                type="date"
+                className="flex-1 h-8 text-xs bg-secondary/40 border border-border rounded-md px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                value={newTaskReminderDate}
+                onChange={(e) => setNewTaskReminderDate(e.target.value)}
+                style={{ colorScheme: "dark" }}
+              />
+            ) : (
+              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 hover:bg-secondary/50" onClick={() => setShowDatePicker(true)} title="Seleccionar fecha">
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+              </Button>
+            )}
+          </div>
         )}
       </div>
     </div>

@@ -1,142 +1,254 @@
 "use client"
 
 import React, { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from "react"
-import { Volume2, VolumeX, Book, Waves, CloudRain, Wind, TreePine } from "lucide-react"
+import { Volume2, VolumeX, Coffee, TreePine, Brain, Zap, Cpu } from "lucide-react"
 import { Slider } from "@/components/ui/slider"
 
-const sounds = [
+// ─── Brown noise buffer generator ───────────────────────────────────────────
+function fillBrownNoise(data) {
+  let last = 0
+  for (let i = 0; i < data.length; i++) {
+    const w = Math.random() * 2 - 1
+    last = (last + 0.02 * w) / 1.02
+    data[i] = last * 3.5
+  }
+}
+
+const BUFFER_DURATION = 30 // seconds
+
+// ─── Sound definitions ───────────────────────────────────────────────────────
+//
+// type: 'binaural'  → two oscillators, one per ear
+// type: 'generated' → AudioBufferSourceNode with loop=true
+// type: 'url'       → HTMLAudioElement routed through Web Audio
+//
+const SOUNDS = [
+  {
+    id: "theta",
+    label: "Theta",
+    subtitle: "4–8 Hz · Meditación",
+    icon: Brain,
+    type: "binaural",
+    baseFreq: 200,
+    beatFreq: 6,
+  },
+  {
+    id: "alpha",
+    label: "Alpha",
+    subtitle: "8–12 Hz · Enfoque",
+    icon: Zap,
+    type: "binaural",
+    baseFreq: 200,
+    beatFreq: 10,
+  },
+  {
+    id: "beta",
+    label: "Beta",
+    subtitle: "12–30 Hz · Alerta",
+    icon: Cpu,
+    type: "binaural",
+    baseFreq: 200,
+    beatFreq: 20,
+  },
   {
     id: "brown",
-    label: "Ruido Blanco",
-    icon: Waves,
-    url: "https://upload.wikimedia.org/wikipedia/commons/d/d9/Brown_noise_15-00_69kbps.mp3"
-  },
-  {
-    id: "rain",
-    label: "Lluvia",
-    icon: CloudRain,
-    url: "https://actions.google.com/sounds/v1/weather/rain_heavy_loud.ogg"
-  },
-  {
-    id: "library",
-    label: "Biblioteca",
-    icon: Book,
-    url: "/ambiance-audio/library.mp3"
-  },
-  {
-    id: "wind",
-    label: "Viento",
-    icon: Wind,
-    url: "https://upload.wikimedia.org/wikipedia/commons/2/2d/Howling_wind.ogg"
+    label: "Marrón",
+    subtitle: "Ruido de fondo",
+    icon: Coffee,
+    type: "generated",
   },
   {
     id: "forest",
     label: "Bosque",
+    subtitle: "Ambiente natural",
     icon: TreePine,
-    url: "https://upload.wikimedia.org/wikipedia/commons/0/0a/20090610_0_ambience.ogg"
+    type: "url",
+    url: "https://upload.wikimedia.org/wikipedia/commons/0/0a/20090610_0_ambience.ogg",
   },
 ]
 
+// ─── Component ───────────────────────────────────────────────────────────────
 const AmbientSounds = forwardRef((props, ref) => {
   const [activeSound, setActiveSound] = useState(null)
   const [volume, setVolume] = useState(0.5)
   const [isPlaying, setIsPlaying] = useState(false)
-  const audioRef = useRef(null)
 
-  useEffect(() => {
-    // Cleanup on unmount
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause()
-        audioRef.current = null
-      }
+  const audioCtxRef  = useRef(null)
+  const gainNodeRef  = useRef(null)
+  const stopFnRef    = useRef(null) // function to stop current sound
+
+  // ── Create / get AudioContext ─────────────────────────────────────────────
+  const getCtx = useCallback(() => {
+    if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      const gain = ctx.createGain()
+      gain.gain.value = volume * (volume > 0 ? 1 : 0)
+      gain.connect(ctx.destination)
+      audioCtxRef.current = ctx
+      gainNodeRef.current = gain
+    }
+    return { ctx: audioCtxRef.current, gain: gainNodeRef.current }
+  }, [volume])
+
+  // ── Stop whatever is playing ──────────────────────────────────────────────
+  const stopAll = useCallback(() => {
+    if (stopFnRef.current) {
+      stopFnRef.current()
+      stopFnRef.current = null
     }
   }, [])
 
-  useImperativeHandle(ref, () => ({
-    autoPlay: () => {
-        if (!isPlaying && activeSound) {
-            const sound = sounds.find(s => s.id === activeSound)
-            if (sound) {
-               const audio = new Audio(sound.url)
-               audio.loop = true
-               audio.volume = volume
-               audio.play().catch(e => console.error("Error playing audio:", e))
-               audioRef.current = audio
-               setIsPlaying(true)
-            }
-        } else if (!isPlaying && !activeSound) {
-            // default to rain if no sound was selected
-            const sound = sounds[1]
-            const audio = new Audio(sound.url)
-            audio.loop = true
-            audio.volume = volume
-            audio.play().catch(e => console.error("Error playing audio:", e))
-            audioRef.current = audio
-            setActiveSound(sound.id)
-            setIsPlaying(true)
-        }
-    },
-    autoPause: () => {
-        if (isPlaying && audioRef.current) {
-           audioRef.current.pause()
-           audioRef.current = null
-           setIsPlaying(false)
-        }
-    }
-  }), [isPlaying, activeSound, volume])
+  // ── Binaural beats ────────────────────────────────────────────────────────
+  // Two sine oscillators, one per stereo channel, slightly different freq.
+  // The brain perceives the difference as a low-frequency beat (the brainwave).
+  // IMPORTANT: works best with headphones/earphones.
+  const playBinaural = useCallback((baseFreq, beatFreq) => {
+    const { ctx, gain } = getCtx()
+    if (ctx.state === "suspended") ctx.resume()
 
+    // We need a stereo output: merge two mono oscillators into L/R channels
+    const merger = ctx.createChannelMerger(2)
+    merger.connect(gain)
+
+    const makeOsc = (freq) => {
+      const osc = ctx.createOscillator()
+      osc.type = "sine"
+      osc.frequency.value = freq
+      // Soft gain so a pure sine isn't too piercing
+      const g = ctx.createGain()
+      g.gain.value = 0.25
+      osc.connect(g)
+      return { osc, g }
+    }
+
+    const left  = makeOsc(baseFreq)
+    const right = makeOsc(baseFreq + beatFreq)
+
+    left.g.connect(merger,  0, 0) // → left channel
+    right.g.connect(merger, 0, 1) // → right channel
+
+    left.osc.start()
+    right.osc.start()
+
+    stopFnRef.current = () => {
+      left.osc.stop()
+      right.osc.stop()
+      merger.disconnect()
+    }
+  }, [getCtx])
+
+  // ── Brown noise (generated buffer, seamless loop) ─────────────────────────
+  const playGenerated = useCallback(() => {
+    const { ctx, gain } = getCtx()
+    if (ctx.state === "suspended") ctx.resume()
+
+    const bufferSize = ctx.sampleRate * BUFFER_DURATION
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
+    fillBrownNoise(buffer.getChannelData(0))
+
+    const source = ctx.createBufferSource()
+    source.buffer = buffer
+    source.loop = true
+    source.connect(gain)
+    source.start(0)
+
+    stopFnRef.current = () => {
+      try { source.stop() } catch (_) {}
+      source.disconnect()
+    }
+  }, [getCtx])
+
+  // ── URL-based (HTMLAudioElement routed through Web Audio) ─────────────────
+  const playUrl = useCallback((url) => {
+    const { ctx, gain } = getCtx()
+    if (ctx.state === "suspended") ctx.resume()
+
+    const audio = new Audio(url)
+    audio.loop = true
+    audio.crossOrigin = "anonymous"
+
+    const mediaSource = ctx.createMediaElementSource(audio)
+    mediaSource.connect(gain)
+    audio.play().catch(err => console.error("Error playing URL audio:", err))
+
+    stopFnRef.current = () => {
+      audio.pause()
+      audio.src = ""
+      mediaSource.disconnect()
+    }
+  }, [getCtx])
+
+  // ── Main play / toggle ────────────────────────────────────────────────────
   const playSound = useCallback((sound) => {
     if (activeSound === sound.id) {
-      // Stop current sound
-      if (audioRef.current) {
-        audioRef.current.pause()
-        audioRef.current = null
-      }
+      stopAll()
       setActiveSound(null)
       setIsPlaying(false)
       return
     }
 
-    // Stop previous sound if any
-    if (audioRef.current) {
-      audioRef.current.pause()
-    }
+    stopAll()
 
-    // Play new sound
-    const audio = new Audio(sound.url)
-    audio.loop = true
-    audio.volume = volume
-    audio.play().catch(e => console.error("Error playing audio:", e))
-    audioRef.current = audio
+    if (sound.type === "binaural")  playBinaural(sound.baseFreq, sound.beatFreq)
+    else if (sound.type === "generated") playGenerated()
+    else if (sound.type === "url")  playUrl(sound.url)
 
     setActiveSound(sound.id)
     setIsPlaying(true)
-  }, [activeSound, volume])
+  }, [activeSound, stopAll, playBinaural, playGenerated, playUrl])
 
-  const handleVolumeChange = useCallback((newVolume) => {
-    const vol = newVolume[0]
+  // ── Volume ────────────────────────────────────────────────────────────────
+  const handleVolumeChange = useCallback((val) => {
+    const vol = val[0]
     setVolume(vol)
-    if (audioRef.current) {
-      audioRef.current.volume = vol
+    if (gainNodeRef.current && audioCtxRef.current) {
+      gainNodeRef.current.gain.setTargetAtTime(
+        vol,
+        audioCtxRef.current.currentTime,
+        0.02
+      )
     }
   }, [])
 
+  // ── Expose to parent (Pomodoro integration) ───────────────────────────────
+  useImperativeHandle(ref, () => ({
+    autoPlay: () => {
+      if (!isPlaying) {
+        const sound = SOUNDS.find(s => s.id === activeSound) || SOUNDS[0]
+        playSound(sound)
+      }
+    },
+    autoPause: () => {
+      if (isPlaying) {
+        stopAll()
+        setIsPlaying(false)
+      }
+    },
+  }), [isPlaying, activeSound, playSound, stopAll])
+
+  // ── Cleanup on unmount ────────────────────────────────────────────────────
+  useEffect(() => () => {
+    stopAll()
+    if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
+      audioCtxRef.current.close()
+    }
+  }, [stopAll])
+
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {isPlaying ? (
-            <Volume2 className="w-4 h-4 text-muted-foreground" />
-          ) : (
-            <VolumeX className="w-4 h-4 text-muted-foreground" />
-          )}
-          <h3 className="text-sm font-medium text-muted-foreground">Ambiente</h3>
-        </div>
+      {/* Header */}
+      <div className="flex items-center gap-2">
+        {isPlaying
+          ? <Volume2 className="w-4 h-4 text-muted-foreground" />
+          : <VolumeX className="w-4 h-4 text-muted-foreground" />
+        }
+        <h3 className="text-sm font-medium text-muted-foreground">Ambiente</h3>
       </div>
 
+      {/* Sound buttons */}
       <div className="grid grid-cols-5 gap-1.5">
-        {sounds.map((sound) => {
+        {SOUNDS.map((sound) => {
           const Icon = sound.icon
           const isActive = activeSound === sound.id
           return (
@@ -144,6 +256,7 @@ const AmbientSounds = forwardRef((props, ref) => {
               key={sound.id}
               type="button"
               onClick={() => playSound(sound)}
+              title={`${sound.label} — ${sound.subtitle}${sound.type === "binaural" ? "\n🎧 Mejor con auriculares" : ""}`}
               className={`
                 flex flex-col items-center justify-center p-2 rounded-lg transition-all duration-200 cursor-pointer
                 ${isActive
@@ -151,7 +264,6 @@ const AmbientSounds = forwardRef((props, ref) => {
                   : "bg-secondary/30 text-muted-foreground hover:bg-secondary/50 hover:text-foreground hover:scale-105"
                 }
               `}
-              title={sound.label}
             >
               <Icon className="w-4 h-4" />
             </button>
@@ -159,6 +271,14 @@ const AmbientSounds = forwardRef((props, ref) => {
         })}
       </div>
 
+      {/* Headphones hint for binaural */}
+      {activeSound && SOUNDS.find(s => s.id === activeSound)?.type === "binaural" && (
+        <p className="text-[10px] text-muted-foreground/60 text-center">
+          🎧 Mejor efecto con auriculares
+        </p>
+      )}
+
+      {/* Volume slider */}
       <div className="flex items-center gap-3 pt-1">
         <VolumeX className="w-3 h-3 text-muted-foreground" />
         <Slider
