@@ -1,6 +1,9 @@
 "use client"
 
+import { useLanguage } from "@/lib/language-context"
+
 export default function ProgressRings({ currentTime }) {
+  const { t } = useLanguage()
   const hours = currentTime.getHours()
   const minutes = currentTime.getMinutes()
 
@@ -42,11 +45,11 @@ export default function ProgressRings({ currentTime }) {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-medium text-muted-foreground">Progreso</h3>
+      <h3 className="text-sm font-medium text-muted-foreground">{t.progress.title}</h3>
       <div className="space-y-3">
-        <ProgressBar progress={dayProgress} label="Día" color="var(--primary)" segments={24} />
-        <ProgressBar progress={monthProgress} label="Mes" color="var(--accent)" segments={20} />
-        <ProgressBar progress={yearProgress} label="Año" color="var(--ring)" segments={12} />
+        <ProgressBar progress={dayProgress} label={t.progress.day} color="var(--primary)" segments={24} />
+        <ProgressBar progress={monthProgress} label={t.progress.month} color="var(--accent)" segments={20} />
+        <ProgressBar progress={yearProgress} label={t.progress.year} color="var(--ring)" segments={12} />
       </div>
     </div>
   )

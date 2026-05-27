@@ -4,8 +4,10 @@ import React, { useState, useEffect, useRef } from "react"
 import { ListTodo, Check, Plus, Trash2, Edit2, GripVertical, Bell, ChevronDown, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useLanguage } from "@/lib/language-context"
 
 const TaskList = () => {
+  const { lang, t } = useLanguage()
   const [tasks, setTasks] = useState([])
   const [newTask, setNewTask] = useState("")
   const [newTaskReminderTime, setNewTaskReminderTime] = useState("")
@@ -39,7 +41,7 @@ const TaskList = () => {
           const delay = reminderDate.getTime() - now.getTime()
           timeoutsRef.current[task.id] = setTimeout(() => {
             if ("Notification" in window && Notification.permission === "granted") {
-              new Notification("Recordatorio de Tarea", { body: task.title, icon: "/icon-192.png" })
+              new Notification(t.tasks.reminderTitle || "Recordatorio de Tarea", { body: task.title, icon: "/icon-192.png" })
             }
           }, delay)
         }
@@ -111,8 +113,8 @@ const TaskList = () => {
   const formatReminder = (dt) => {
     if (!dt) return null
     const d = new Date(dt)
-    const date = d.toLocaleDateString("es-ES", { day: "numeric", month: "short" })
-    const time = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", hour12: false })
+    const date = d.toLocaleDateString(t.dateLocale, { day: "numeric", month: "short" })
+    const time = d.toLocaleTimeString(t.dateLocale, { hour: "2-digit", minute: "2-digit", hour12: false })
     return `${date} ${time}`
   }
 
@@ -121,9 +123,9 @@ const TaskList = () => {
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
           <ListTodo className="w-4 h-4 text-muted-foreground" />
-          Tareas
+          {t.tasks.title}
         </h3>
-        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={() => setIsEditing(!isEditing)}>
+        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={() => setIsEditing(!isEditing)} title={isEditing ? t.settings.finishEditing : (lang === 'es' ? 'Editar' : 'Edit')}>
           {isEditing ? <Check className="w-4 h-4 text-primary" /> : <Edit2 className="w-4 h-4" />}
         </Button>
       </div>
@@ -166,7 +168,7 @@ const TaskList = () => {
                 )}
               </div>
               {isEditing && (
-                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0" onClick={() => deleteTask(task.id)}>
+                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0" onClick={() => deleteTask(task.id)} title={t.tasks.delete}>
                   <Trash2 className="w-4 h-4" />
                 </Button>
               )}
@@ -179,13 +181,13 @@ const TaskList = () => {
       <div className="pt-2 space-y-1.5">
         <div className="flex gap-2 items-center">
           <Input
-            placeholder="Nueva tarea..."
+            placeholder={t.tasks.placeholder}
             className="h-8 text-sm flex-1"
             value={newTask}
             onChange={(e) => setNewTask(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addTask()}
           />
-          <Button size="sm" className="h-8 w-8 p-0 shrink-0" onClick={addTask}>
+          <Button size="sm" className="h-8 w-8 p-0 shrink-0" onClick={addTask} title={t.tasks.add}>
             <Plus className="w-4 h-4" />
           </Button>
         </div>
@@ -196,7 +198,7 @@ const TaskList = () => {
           onClick={() => setShowReminder(prev => !prev)}
         >
           <ChevronDown className={`w-3 h-3 transition-transform ${showReminder ? "rotate-180" : ""}`} />
-          Añadir recordatorio
+          {t.tasks.addReminder || "Añadir recordatorio"}
         </button>
 
         {showReminder && (
@@ -217,7 +219,7 @@ const TaskList = () => {
                 style={{ colorScheme: "dark" }}
               />
             ) : (
-              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 hover:bg-secondary/50" onClick={() => setShowDatePicker(true)} title="Seleccionar fecha">
+              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 hover:bg-secondary/50" onClick={() => setShowDatePicker(true)} title={t.tasks.selectDate || "Seleccionar fecha"}>
                 <Calendar className="w-4 h-4 text-muted-foreground" />
               </Button>
             )}

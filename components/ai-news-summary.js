@@ -1,35 +1,37 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import { Sparkles, RefreshCw, AlertCircle } from "lucide-react"
+import { useLanguage } from "@/lib/language-context"
 
 const AiNewsSummary = () => {
+  const { lang, t } = useLanguage()
   const [news, setNews] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  const fetchNews = async () => {
+  const fetchNews = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch("/api/ai-news")
+      const res = await fetch(`/api/ai-news?lang=${lang}`)
       const json = await res.json()
       
       if (json.success) {
         setNews(json.data)
       } else {
-        setError(json.error || "Error al cargar el resumen de noticias.")
+        setError(json.error || (lang === 'en' ? "Error loading news summary." : "Error al cargar el resumen de noticias."))
       }
     } catch (err) {
-      setError("Error de conexión. Inténtalo más tarde.")
+      setError(lang === 'en' ? "Connection error. Try again later." : "Error de conexión. Inténtalo más tarde.")
     } finally {
       setLoading(false)
     }
-  }
+  }, [lang])
 
   useEffect(() => {
     fetchNews()
-  }, [])
+  }, [fetchNews])
 
   // Parsear markdown simple (viñetas y negritas)
   const renderNewsContent = (text) => {
@@ -70,13 +72,13 @@ const AiNewsSummary = () => {
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-primary" />
-          Resumen AI
+          {t.aiNews.title}
         </h3>
         <button 
           onClick={fetchNews} 
           disabled={loading}
           className="text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
-          title="Actualizar resumen"
+          title={t.aiNews.refresh}
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
         </button>
@@ -105,7 +107,7 @@ const AiNewsSummary = () => {
       
       {!loading && !error && (
          <p className="text-[10px] text-muted-foreground/60 text-center pt-2 mt-auto border-t border-border/50">
-           Generado por Gemini AI
+           {t.aiNews.generatedBy}
          </p>
       )}
     </div>

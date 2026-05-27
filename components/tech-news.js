@@ -3,8 +3,10 @@
 import React, { useState, useEffect, useCallback } from "react"
 import { Newspaper, ChevronRight, ExternalLink, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useLanguage } from "@/lib/language-context"
 
 const TechNews = () => {
+  const { t } = useLanguage()
   const [currentIndex, setCurrentIndex] = useState(0)
   const [techNews, setTechNews] = useState([])
   const [loading, setLoading] = useState(false)
@@ -38,7 +40,7 @@ const TechNews = () => {
       setTechNews(formattedNews)
     } catch (error) {
       console.error("Error fetching news:", error)
-      setTechNews([{ title: "Error al cargar noticias", url: "#", time: "", score: 0 }])
+      setTechNews([{ title: t.techNews.loadError, url: "#", time: "", score: 0 }])
     }
     setLoading(false)
   }, [])
@@ -60,7 +62,7 @@ const TechNews = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Newspaper className="w-4 h-4 text-muted-foreground" />
-          <h3 className="text-sm font-medium text-muted-foreground">Tech News</h3>
+          <h3 className="text-sm font-medium text-muted-foreground">{t.techNews.title}</h3>
         </div>
         <div className="flex items-center gap-1">
           <Button
@@ -87,7 +89,7 @@ const TechNews = () => {
         {loading && techNews.length === 0 ? (
           <div className="flex items-center gap-2 text-muted-foreground">
             <Loader2 className="w-4 h-4 animate-spin" />
-            <span className="text-sm">Cargando...</span>
+            <span className="text-sm">{t.techNews.loading}</span>
           </div>
         ) : techNews.length > 0 ? (
           <div key={currentIndex} className="space-y-2 w-full animate-in fade-in slide-in-from-right-2 duration-300">
@@ -107,7 +109,7 @@ const TechNews = () => {
             </div>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">Sin noticias</p>
+          <p className="text-sm text-muted-foreground">{t.techNews.noNews}</p>
         )}
       </div>
     </div>

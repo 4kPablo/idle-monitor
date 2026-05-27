@@ -33,37 +33,39 @@ function getCurrentTimeWindow() {
   return `${dateKey}-window-${windowIndex}`;
 }
 
-async function fetchNewsFromGemini() {
+async function fetchNewsFromGemini(lang) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error("La clave de API de Gemini no está configurada.");
+    throw new Error(lang === "en" ? "Gemini API key is not configured." : "La clave de API de Gemini no está configurada.");
   }
 
-  const prompt = "Dame un breve resumen de 3 o 4 viñetas de las noticias mundiales más importantes de las últimas horas. Sé muy conciso y neutral. Escríbelo en español. Usa formato Markdown con viñetas (-).";
+  const prompt = lang === "en"
+    ? "Give me a brief summary of 3 or 4 bullet points of the most important world news from the last few hours. Be very concise and neutral. Write it in English. Use Markdown format with bullet points (-)."
+    : "Dame un breve resumen de 3 o 4 viñetas de las noticias mundiales más importantes de las últimas horas. Sé muy conciso y neutral. Escríbelo en español. Usa formato Markdown con viñetas (-).";
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      tools: [{ googleSearch: {} }]
+      tools: [{ google_search: {} }]
     })
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error("Gemini API Error:", errorText);
-    throw new Error(`Error de Gemini API: ${response.statusText}`);
+    console.error(`Gemini API Error [${response.status} ${response.statusText}]:`, errorText);
+    throw new Error(`Error de Gemini API [${response.status}]: ${errorText}`);
   }
 
   const data = await response.json();
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  return text || "No hay noticias disponibles en este momento.";
+  return text || (lang === "en" ? "No news available at this time." : "No hay noticias disponibles en este momento.");
 }
 
 const getCachedNews = unstable_cache(
-  async (windowKey) => {
-    return await fetchNewsFromGemini();
+  async (windowKey, lang) => {
+    return await fetchNewsFromGemini(lang);
   },
   ['gemini-news-cache'],
   {
@@ -71,10 +73,12 @@ const getCachedNews = unstable_cache(
   }
 );
 
-export async function GET() {
+export async function GET(req) {
   try {
-    const windowKey = getCurrentTimeWindow();
-    const newsSummary = await getCachedNews(windowKey);
+    const { searchParams } = new URL(req.url);
+    const lang = searchParams.get("lang") === "en" ? "en" : "es";
+    const windowKey = `${getCurrentTimeWindow()}-${lang}`;
+    const newsSummary = await getCachedNews(windowKey, lang);
     
     return NextResponse.json({
       success: true,
@@ -85,7 +89,7 @@ export async function GET() {
     console.error("Error en /api/ai-news:", error);
     return NextResponse.json({
       success: false,
-      error: "No se pudieron obtener las noticias. Verifica la clave de API y la conexión."
+      error: error.message || "No se pudieron obtener las noticias. Verifica la clave de API y la conexión."
     }, { status: 500 });
   }
 }

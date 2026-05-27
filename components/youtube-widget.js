@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react"
 import { Youtube, Search, X, Play, Pause, Bookmark, Save, Pencil, Trash2, GripVertical, Eye, EyeOff, Maximize, Volume2 } from "lucide-react"
 import { toast } from "sonner"
+import { useLanguage } from "@/lib/language-context"
 import {
   DndContext,
   closestCenter,
@@ -26,6 +27,7 @@ import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 
 const SortableVideoItem = ({ video, onPlay, onRename, onDelete }) => {
+    const { t } = useLanguage()
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: video.id })
     const style = { transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 10 : 1, opacity: isDragging ? 0.5 : 1 }
     
@@ -44,10 +46,10 @@ const SortableVideoItem = ({ video, onPlay, onRename, onDelete }) => {
               <HoverCardContent className="w-64 z-[100] border-border bg-card/95 backdrop-blur-sm" side="top">
                 <div className="space-y-1">
                   <h4 className="text-sm font-semibold text-foreground leading-tight">{video.title}</h4>
-                  {video.author && <p className="text-xs text-muted-foreground">Canal: {video.author}</p>}
+                  {video.author && <p className="text-xs text-muted-foreground">{t.youtube.channel} {video.author}</p>}
                   {video.createdAt && (
                       <p className="text-[10px] text-muted-foreground/70 pt-2 border-t border-border/50 mt-2">
-                        Añadido el: {new Date(video.createdAt).toLocaleDateString("es-ES", { day: 'numeric', month: 'long', year: 'numeric' })}
+                        {t.youtube.addedOn} {new Date(video.createdAt).toLocaleDateString(t.dateLocale, { day: 'numeric', month: 'long', year: 'numeric' })}
                       </p>
                   )}
                 </div>
@@ -56,10 +58,10 @@ const SortableVideoItem = ({ video, onPlay, onRename, onDelete }) => {
 
             <div className="absolute right-0 top-0 bottom-0 flex items-center justify-end px-2 w-32 opacity-0 group-hover/item:opacity-100 transition-opacity bg-gradient-to-l from-background/95 via-background/80 to-transparent pointer-events-none">
                 <div className="flex gap-1 pointer-events-auto pl-10">
-                    <button onClick={() => onRename(video)} className="p-1 text-muted-foreground hover:text-primary transition-colors bg-secondary/80 rounded backdrop-blur-sm" title="Renombrar">
+                    <button onClick={() => onRename(video)} className="p-1 text-muted-foreground hover:text-primary transition-colors bg-secondary/80 rounded backdrop-blur-sm" title={t.youtube.rename}>
                         <Pencil className="w-3 h-3" />
                     </button>
-                    <button onClick={() => onDelete(video)} className="p-1 text-muted-foreground hover:text-destructive transition-colors bg-secondary/80 rounded backdrop-blur-sm" title="Eliminar">
+                    <button onClick={() => onDelete(video)} className="p-1 text-muted-foreground hover:text-destructive transition-colors bg-secondary/80 rounded backdrop-blur-sm" title={t.youtube.delete}>
                         <Trash2 className="w-3 h-3" />
                     </button>
                 </div>
@@ -69,6 +71,7 @@ const SortableVideoItem = ({ video, onPlay, onRename, onDelete }) => {
 }
 
 const YoutubeWidget = ({ videoId, setVideoId, isVideoBackground, setIsVideoBackground, isFullscreenViewport, setIsFullscreenViewport, youtubePlaylistExpanded, setYoutubePlaylistExpanded }) => {
+    const { lang, t } = useLanguage()
     const [url, setUrl] = useState("")
     const [isPlaying, setIsPlaying] = useState(true)
     const [savedVideos, setSavedVideos] = useState([])
@@ -152,9 +155,9 @@ const YoutubeWidget = ({ videoId, setVideoId, isVideoBackground, setIsVideoBackg
         toast.promise(
             fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${id}`).then(res => res.json()),
             {
-                loading: 'Obteniendo información del video...',
+                loading: t.youtube.fetchLoading,
                 success: (data) => {
-                    const title = data.title || "Video Guardado"
+                    const title = data.title || t.youtube.defaultTitle
                     const author = data.author_name || ""
                     const newVideo = { id: crypto.randomUUID(), url, videoId: id, title, author, createdAt: Date.now() }
                     setSavedVideos(prev => {
@@ -163,10 +166,10 @@ const YoutubeWidget = ({ videoId, setVideoId, isVideoBackground, setIsVideoBackg
                         return newList
                     })
                     setUrl("")
-                    return `Guardado: ${title}`
+                    return `${t.youtube.fetchSuccess} ${title}`
                 },
                 error: () => {
-                    const title = "Video Guardado"
+                    const title = t.youtube.defaultTitle
                     const newVideo = { id: crypto.randomUUID(), url, videoId: id, title, createdAt: Date.now() }
                     setSavedVideos(prev => {
                         const newList = [...prev, newVideo]
@@ -174,7 +177,7 @@ const YoutubeWidget = ({ videoId, setVideoId, isVideoBackground, setIsVideoBackg
                         return newList
                     })
                     setUrl("")
-                    return "Video guardado (sin título original)"
+                    return t.youtube.fetchError
                 }
             }
         )
@@ -189,7 +192,7 @@ const YoutubeWidget = ({ videoId, setVideoId, isVideoBackground, setIsVideoBackg
         if (newTitle.trim() && videoToRename) {
             const newList = savedVideos.map(v => v.id === videoToRename.id ? { ...v, title: newTitle.trim() } : v)
             savePlaylist(newList)
-            toast.success("Nombre actualizado")
+            toast.success(t.youtube.renameSuccess)
         }
         setVideoToRename(null)
     }
@@ -200,10 +203,10 @@ const YoutubeWidget = ({ videoId, setVideoId, isVideoBackground, setIsVideoBackg
         newList.splice(index, 1)
         savePlaylist(newList)
         
-        toast("Video eliminado", {
+        toast(t.youtube.deleteMsg, {
             description: video.title,
             action: {
-                label: "Deshacer",
+                label: t.youtube.undoDelete,
                 onClick: () => {
                     setSavedVideos(prev => {
                         const restored = [...prev]
@@ -226,9 +229,9 @@ const YoutubeWidget = ({ videoId, setVideoId, isVideoBackground, setIsVideoBackg
         <div className={`space-y-3 flex flex-col relative ${youtubePlaylistExpanded ? "h-auto max-h-[75vh]" : "h-full"}`}>
             <div className="flex justify-between items-center w-full">
                 <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <Youtube className="w-4 h-4 text-muted-foreground" /> YouTube
+                    <Youtube className="w-4 h-4 text-muted-foreground" /> {t.widgets.youtube}
                 </h3>
-                <button onClick={() => setYoutubePlaylistExpanded(!youtubePlaylistExpanded)} className={`p-1 rounded-md transition-colors ${youtubePlaylistExpanded ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-secondary'}`} title="Lista de reproducción">
+                <button onClick={() => setYoutubePlaylistExpanded(!youtubePlaylistExpanded)} className={`p-1 rounded-md transition-colors ${youtubePlaylistExpanded ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-secondary'}`} title={t.youtube.playlist}>
                     <Bookmark className="w-4 h-4" />
                 </button>
             </div>
@@ -238,7 +241,7 @@ const YoutubeWidget = ({ videoId, setVideoId, isVideoBackground, setIsVideoBackg
                     videoId ? (
                         <div className="flex-grow w-full flex flex-col gap-2 pt-2 h-full">
                             <p className="text-[10px] text-muted-foreground text-center font-medium">
-                                {isVideoBackground ? "Reproduciendo en segundo plano" : "Reproduciendo en primer plano"}
+                                {isVideoBackground ? t.youtube.bgPlay : t.youtube.fgPlay}
                             </p>
                             
                             <div className="flex items-center gap-3 px-2 mt-auto pb-2">
@@ -253,16 +256,16 @@ const YoutubeWidget = ({ videoId, setVideoId, isVideoBackground, setIsVideoBackg
                             </div>
 
                             <div className="flex gap-2 w-full">
-                               <button onClick={togglePlay} className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/80 py-1.5 rounded-md flex items-center justify-center transition-colors" title={isPlaying ? "Pausar" : "Reproducir"}>
+                               <button onClick={togglePlay} className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/80 py-1.5 rounded-md flex items-center justify-center transition-colors" title={isPlaying ? t.youtube.pause : t.youtube.play}>
                                    {isPlaying ? <Pause className="w-4 h-4"/> : <Play className="w-4 h-4 ml-0.5"/>}
                                </button>
-                               <button onClick={() => setIsVideoBackground(!isVideoBackground)} className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/80 py-1.5 rounded-md flex items-center justify-center transition-colors" title={isVideoBackground ? "Volver a primer plano" : "Reproducir en segundo plano"}>
+                               <button onClick={() => setIsVideoBackground(!isVideoBackground)} className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/80 py-1.5 rounded-md flex items-center justify-center transition-colors" title={isVideoBackground ? t.youtube.foreground : t.youtube.background}>
                                    {isVideoBackground ? <Eye className="w-4 h-4"/> : <EyeOff className="w-4 h-4"/>}
                                </button>
-                               <button onClick={() => {if(setIsFullscreenViewport) setIsFullscreenViewport(!isFullscreenViewport)}} className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/80 py-1.5 rounded-md flex items-center justify-center transition-colors" title="Pantalla completa en ventana">
+                               <button onClick={() => {if(setIsFullscreenViewport) setIsFullscreenViewport(!isFullscreenViewport)}} className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/80 py-1.5 rounded-md flex items-center justify-center transition-colors" title={t.youtube.fullscreen}>
                                    <Maximize className="w-4 h-4"/>
                                </button>
-                               <button onClick={() => { setVideoId(""); setIsVideoBackground(false); if(setIsFullscreenViewport) setIsFullscreenViewport(false); }} className="flex-1 bg-destructive/10 text-destructive hover:bg-destructive/20 py-1.5 rounded-md flex items-center justify-center transition-colors" title="Cerrar video">
+                               <button onClick={() => { setVideoId(""); setIsVideoBackground(false); if(setIsFullscreenViewport) setIsFullscreenViewport(false); }} className="flex-1 bg-destructive/10 text-destructive hover:bg-destructive/20 py-1.5 rounded-md flex items-center justify-center transition-colors" title={t.youtube.close}>
                                    <X className="w-4 h-4" />
                                </button>
                             </div>
@@ -273,16 +276,17 @@ const YoutubeWidget = ({ videoId, setVideoId, isVideoBackground, setIsVideoBackg
                                 <input
                                     type="text"
                                     className="w-full text-xs bg-background border border-border rounded px-3 py-2 outline-none focus:border-primary transition-colors"
-                                    placeholder="Enlace de YouTube..."
+                                    placeholder={t.youtube.placeholder}
                                     value={url}
                                     onChange={(e) => setUrl(e.target.value)}
+                                    title={t.youtube.placeholder}
                                 />
                                 <div className="flex gap-2">
                                     <button type="submit" className="flex-1 bg-primary/10 text-primary hover:bg-primary/20 rounded px-2 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1">
-                                        <Play className="w-3 h-3" /> Reproducir
+                                        <Play className="w-3 h-3" /> {t.youtube.play}
                                     </button>
                                     <button type="button" onClick={handleSaveVideo} className="flex-1 bg-secondary/30 text-secondary-foreground hover:bg-secondary rounded px-2 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1">
-                                        <Save className="w-3 h-3" /> Guardar
+                                        <Save className="w-3 h-3" /> {t.youtube.save}
                                     </button>
                                 </div>
                             </div>
@@ -293,7 +297,7 @@ const YoutubeWidget = ({ videoId, setVideoId, isVideoBackground, setIsVideoBackg
                         {savedVideos.length === 0 ? (
                             <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground gap-2 py-8">
                                 <Bookmark className="w-8 h-8 opacity-20" />
-                                <p className="text-xs">No hay videos guardados</p>
+                                <p className="text-xs">{t.youtube.noVideos}</p>
                             </div>
                         ) : (
                             <>
@@ -307,7 +311,7 @@ const YoutubeWidget = ({ videoId, setVideoId, isVideoBackground, setIsVideoBackg
                                     </DndContext>
                                 </div>
                                 <div className="text-center pt-2 text-[10px] text-muted-foreground font-medium border-t border-border/50">
-                                    {savedVideos.length} {savedVideos.length === 1 ? 'video guardado' : 'videos guardados'}
+                                    {savedVideos.length} {savedVideos.length === 1 ? t.youtube.videosCount_one : t.youtube.videosCount_other}
                                 </div>
                             </>
                         )}
@@ -318,19 +322,19 @@ const YoutubeWidget = ({ videoId, setVideoId, isVideoBackground, setIsVideoBackg
             <Dialog open={!!videoToRename} onOpenChange={(open) => !open && setVideoToRename(null)}>
                 <DialogContent className="max-w-xs p-4 gap-4">
                     <DialogHeader>
-                        <DialogTitle className="text-sm">Renombrar Video</DialogTitle>
+                        <DialogTitle className="text-sm">{t.youtube.rename}</DialogTitle>
                     </DialogHeader>
                     <Input 
                         value={newTitle} 
                         onChange={(e) => setNewTitle(e.target.value)} 
-                        placeholder="Nuevo título"
+                        placeholder={t.youtube.newTitle}
                         className="text-xs"
                         autoFocus
                         onKeyDown={(e) => { if (e.key === 'Enter') saveRename() }}
                     />
                     <DialogFooter className="gap-2 sm:gap-0">
-                        <Button variant="ghost" size="sm" onClick={() => setVideoToRename(null)}>Cancelar</Button>
-                        <Button size="sm" onClick={saveRename}>Guardar</Button>
+                        <Button variant="ghost" size="sm" onClick={() => setVideoToRename(null)}>{t.youtube.cancel}</Button>
+                        <Button size="sm" onClick={saveRename}>{t.youtube.saveBtn}</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

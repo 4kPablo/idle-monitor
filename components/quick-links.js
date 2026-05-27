@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react"
 import { ExternalLink, Edit2, GripVertical, Trash2, Plus, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useLanguage } from "@/lib/language-context"
 
 const DEFAULT_LINKS = [
   { id: "1", title: "YouTube", url: "https://youtube.com" },
@@ -11,6 +12,7 @@ const DEFAULT_LINKS = [
 ]
 
 const QuickLinks = () => {
+  const { lang, t } = useLanguage()
   const [links, setLinks] = useState([])
   const [isEditing, setIsEditing] = useState(false)
   const [newLink, setNewLink] = useState({ title: "", url: "" })
@@ -71,9 +73,9 @@ const QuickLinks = () => {
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
           <ExternalLink className="w-4 h-4 text-muted-foreground" />
-          Accesos Rápidos
+          {t.quickLinks.title}
         </h3>
-        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={() => setIsEditing(!isEditing)}>
+        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={() => setIsEditing(!isEditing)} title={isEditing ? t.settings.finishEditing : t.quickLinks.edit}>
           {isEditing ? <Check className="w-4 h-4 text-primary" /> : <Edit2 className="w-4 h-4" />}
         </Button>
       </div>
@@ -105,7 +107,7 @@ const QuickLinks = () => {
             {isEditing ? (
               <div className="flex-1 flex items-center gap-2 overflow-hidden">
                 <span className="text-sm font-medium truncate flex-1">{link.title}</span>
-                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0" onClick={() => deleteLink(link.id)}>
+                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0" onClick={() => deleteLink(link.id)} title={t.quickLinks.delete}>
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
@@ -117,27 +119,27 @@ const QuickLinks = () => {
           </div>
         ))}
         {links.length === 0 && !isEditing && (
-          <p className="text-xs text-muted-foreground py-2">No hay accesos rápidos</p>
+          <p className="text-xs text-muted-foreground py-2">{t.quickLinks.empty}</p>
         )}
       </div>
 
       {isEditing && (
         <div className="pt-3 border-t border-border flex flex-col gap-2">
           <Input
-            placeholder="Nombre (ej: YouTube)"
+            placeholder={lang === 'es' ? "Nombre (ej: YouTube)" : "Name (e.g. YouTube)"}
             className="h-8 text-sm"
             value={newLink.title}
             onChange={(e) => setNewLink({ ...newLink, title: e.target.value })}
           />
           <div className="flex gap-2">
             <Input
-              placeholder="URL (ej: youtube.com)"
+              placeholder={lang === 'es' ? "URL (ej: youtube.com)" : "URL (e.g. youtube.com)"}
               className="h-8 text-sm flex-1"
               value={newLink.url}
               onChange={(e) => setNewLink({ ...newLink, url: e.target.value })}
               onKeyDown={(e) => e.key === 'Enter' && addLink()}
             />
-            <Button size="sm" className="h-8 px-2" onClick={addLink}>
+            <Button size="sm" className="h-8 px-2" onClick={addLink} title={t.quickLinks.add}>
               <Plus className="w-4 h-4" />
             </Button>
           </div>

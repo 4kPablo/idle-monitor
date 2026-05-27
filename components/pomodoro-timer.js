@@ -7,6 +7,7 @@ import {
   Check, X, Edit2, Bike, Coffee, Code, Music, Heart, Star, Zap, Moon, SkipForward
 } from "lucide-react"
 import { savePomodoroLog } from "@/lib/pomodoro-store"
+import { useLanguage } from "@/lib/language-context"
 
 // Available icons for activity customization
 const ICON_OPTIONS = [
@@ -62,22 +63,23 @@ function getIconComponent(iconId) {
 }
 
 function ActivityEditor({ draft, setDraft, onSave, onCancel }) {
+  const { t } = useLanguage()
   return (
     <div className="bg-secondary/20 border border-border rounded-2xl p-4 space-y-3">
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-muted-foreground">Nombre</label>
+        <label className="text-xs font-medium text-muted-foreground">{t.pomodoro.name}</label>
         <input
           value={draft.label}
           onChange={e => setDraft(d => ({ ...d, label: e.target.value }))}
-          placeholder="Nombre de la actividad"
+          placeholder={t.pomodoro.activityName}
           className="bg-background border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
           maxLength={20}
         />
       </div>
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-muted-foreground">Modo</label>
+        <label className="text-xs font-medium text-muted-foreground">{t.pomodoro.mode}</label>
         <div className="grid grid-cols-3 gap-1">
-          {[["pomodoro", "Pomodoro"], ["timer", "Timer"], ["stopwatch", "Cronómetro"]].map(([val, lbl]) => (
+          {[["pomodoro", t.pomodoro.pomodoro], ["timer", t.pomodoro.timerMode], ["stopwatch", t.pomodoro.stopwatch]].map(([val, lbl]) => (
             <button
               key={val}
               onClick={() => setDraft(d => ({ ...d, mode: val }))}
@@ -89,7 +91,7 @@ function ActivityEditor({ draft, setDraft, onSave, onCancel }) {
         </div>
       </div>
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-muted-foreground">Color</label>
+        <label className="text-xs font-medium text-muted-foreground">{t.pomodoro.color}</label>
         <div className="flex flex-wrap gap-2">
           {COLOR_OPTIONS.map(c => (
             <button
@@ -102,14 +104,14 @@ function ActivityEditor({ draft, setDraft, onSave, onCancel }) {
         </div>
       </div>
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-muted-foreground">Ícono</label>
+        <label className="text-xs font-medium text-muted-foreground">{t.pomodoro.icon}</label>
         <div className="flex flex-wrap gap-1.5">
           {ICON_OPTIONS.map(({ id, icon: Icon, label }) => (
             <button
               key={id}
               onClick={() => setDraft(d => ({ ...d, iconId: id }))}
               className={`p-1.5 rounded-lg border transition-colors ${draft.iconId === id ? "bg-primary/20 border-primary" : "border-transparent bg-secondary/50 hover:bg-secondary"}`}
-              title={label}
+              title={t.pomodoro.icons[id] || label}
             >
               <Icon className="w-3.5 h-3.5" />
             </button>
@@ -118,7 +120,7 @@ function ActivityEditor({ draft, setDraft, onSave, onCancel }) {
       </div>
       <div className="flex gap-2">
         <button onClick={onSave} className="flex-1 bg-primary text-primary-foreground rounded-lg py-2 text-xs font-medium flex items-center justify-center gap-1 hover:bg-primary/90 transition-colors">
-          <Check className="w-3 h-3" /> Guardar
+          <Check className="w-3 h-3" /> {t.pomodoro.save}
         </button>
         <button onClick={onCancel} className="px-4 bg-secondary text-muted-foreground rounded-lg py-2 text-xs hover:bg-secondary/80 transition-colors">
           <X className="w-3 h-3" />
@@ -129,6 +131,7 @@ function ActivityEditor({ draft, setDraft, onSave, onCancel }) {
 }
 
 export default function PomodoroTimer({ onPomodoroComplete, onPomodoroActive, isFocusMode }) {
+  const { t } = useLanguage()
   const [activities, setActivities] = useState(loadActivities)
   const [selectedActivity, setSelectedActivity] = useState(null)
   const [isManaging, setIsManaging] = useState(false)
@@ -211,7 +214,7 @@ export default function PomodoroTimer({ onPomodoroComplete, onPomodoroActive, is
     if (mode === "pomodoro" && isActive && pomodoroTimeLeft === 0) {
       playNotificationSound()
       if (!isBreak) {
-        showNotification("Pomodoro completado", `Tiempo de descanso.`)
+        showNotification(t.pomodoro.pomodoroComplete, t.pomodoro.breakTime)
         if (elapsedTime >= MIN_DURATION_TO_SAVE && selectedActivity) {
           savePomodoroLog(selectedActivity, Math.round(elapsedTime / 60))
           if (onPomodoroComplete) onPomodoroComplete()
@@ -219,19 +222,19 @@ export default function PomodoroTimer({ onPomodoroComplete, onPomodoroActive, is
         setIsBreak(true); setPomodoroTimeLeft(BREAK_TIME)
         setElapsedTime(0); startTimeRef.current = null
       } else {
-        showNotification("Descanso terminado", "Volver al trabajo.")
+        showNotification(t.pomodoro.breakDone, t.pomodoro.backToWork)
         setIsBreak(false); setPomodoroTimeLeft(WORK_TIME); setIsActive(false)
       }
     } else if (mode === "timer" && isActive && timerLeft === 0) {
       playNotificationSound()
-      showNotification("Temporizador terminado", "El tiempo ha finalizado.")
+      showNotification(t.pomodoro.timerDone, t.pomodoro.timeUp)
       if (elapsedTime >= MIN_DURATION_TO_SAVE && selectedActivity) {
         savePomodoroLog(selectedActivity, Math.round(elapsedTime / 60))
         if (onPomodoroComplete) onPomodoroComplete()
       }
       setIsActive(false); setElapsedTime(0); startTimeRef.current = null
     }
-  }, [pomodoroTimeLeft, timerLeft, isActive, mode, isBreak, elapsedTime, selectedActivity])
+  }, [pomodoroTimeLeft, timerLeft, isActive, mode, isBreak, elapsedTime, selectedActivity, playNotificationSound, showNotification, t])
 
   const resetTimer = (nextMode = mode) => {
     if (elapsedTime >= MIN_DURATION_TO_SAVE && selectedActivity && !isBreak) {
@@ -296,6 +299,13 @@ export default function PomodoroTimer({ onPomodoroComplete, onPomodoroActive, is
 
   // Activity editor panel is defined at module level to avoid re-mount on every render
 
+  const getActivityLabel = (act) => {
+    if (act.id === "study" || act.id === "exercise" || act.id === "draw") {
+      return t.pomodoro[act.id] || act.label
+    }
+    return act.label
+  }
+
   return (
     <div className="space-y-4">
       {/* Activity bar */}
@@ -313,7 +323,7 @@ export default function PomodoroTimer({ onPomodoroComplete, onPomodoroActive, is
                   style={isSelected ? { backgroundColor: activity.color, color: 'white', '--tw-ring-color': activity.color } : {}}
                 >
                   <Icon className="w-3.5 h-3.5" />
-                  {activity.label}
+                  {getActivityLabel(activity)}
                 </button>
                 {isManaging && (
                   <div className="absolute -top-2 -right-2 flex gap-0.5">
@@ -337,7 +347,7 @@ export default function PomodoroTimer({ onPomodoroComplete, onPomodoroActive, is
           <button
             onClick={() => setIsManaging(!isManaging)}
             className={`w-8 h-8 rounded-full border-2 border-dashed flex items-center justify-center transition-colors ${isManaging ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"}`}
-            title="Administrar actividades"
+            title={t.pomodoro.manage}
           >
             {isManaging ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
           </button>
@@ -367,13 +377,13 @@ export default function PomodoroTimer({ onPomodoroComplete, onPomodoroActive, is
               onClick={() => setIsCreating(true)}
               className="w-full py-2 border border-dashed border-border rounded-xl text-xs text-muted-foreground hover:text-foreground hover:border-primary/50 flex items-center justify-center gap-1 transition-colors"
             >
-              <Plus className="w-3 h-3" /> Nueva actividad
+              <Plus className="w-3 h-3" /> {t.pomodoro.newActivity}
             </button>
           )
         )}
 
         {isBreak && mode === "pomodoro" && (
-          <span className="inline-flex text-xs px-2 py-1 rounded-full bg-accent/20 text-accent">Descanso</span>
+          <span className="inline-flex text-xs px-2 py-1 rounded-full bg-accent/20 text-accent">{t.pomodoro.break}</span>
         )}
       </div>
 
@@ -413,7 +423,7 @@ export default function PomodoroTimer({ onPomodoroComplete, onPomodoroActive, is
               setIsBreak(false)
               setPomodoroTimeLeft(WORK_TIME)
               setIsActive(true)
-            }} title="Saltear descanso">
+            }} title={t.pomodoro.skipBreak}>
               <SkipForward className="w-5 h-5" />
             </Button>
           )}

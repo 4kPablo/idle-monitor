@@ -20,6 +20,7 @@ import TaskList from "@/components/task-list"
 import AiNewsSummary from "@/components/ai-news-summary"
 import { getWidgetLayout, saveWidgetLayout, moveWidget } from "@/lib/widget-store"
 import { getSettings, saveSettings } from "@/lib/settings-store"
+import { useLanguage } from "@/lib/language-context"
 import { Settings2, Check, Palette, X, Image as ImageIcon, ArrowLeft, Focus, Maximize, Minimize, Plus, Clock, Monitor, EyeOff, LayoutTemplate, Download, Upload, Bell, Play } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import DigitalClockWidget from "@/components/digital-clock"
@@ -101,13 +102,13 @@ const AutoFitColumn = ({ id, items, children, isCustomizationMode, position }) =
   )
 }
 
-const FocusLauncherWidget = ({ onFocusToggle }) => (
+const FocusLauncherWidget = ({ onFocusToggle, label }) => (
   <div
     onClick={onFocusToggle}
     className="flex flex-row items-center justify-center p-3 gap-2 h-full cursor-pointer group rounded-xl border border-transparent hover:border-primary/20 hover:bg-primary/5 transition-all duration-300"
   >
     <Focus className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors opacity-50 group-hover:opacity-100" />
-    <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">Entrar a Focus</span>
+    <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">{label}</span>
   </div>
 )
 
@@ -190,6 +191,7 @@ const backgroundOptions = [
 ]
 
 export default function HomePage() {
+  const { lang, t, setLang } = useLanguage()
   const [currentTime, setCurrentTime] = useState(new Date())
   const [pomodoroRefresh, setPomodoroRefresh] = useState(0)
   const [hourlyPulse, setHourlyPulse] = useState(false)
@@ -206,7 +208,7 @@ export default function HomePage() {
   const [isFocusMode, setIsFocusMode] = useState(false)
   const [showSeconds, setShowSeconds] = useState(true)
   const [widgetShowSeconds, setWidgetShowSeconds] = useState(true)
-  const [widgetClockStyle, setWidgetClockStyle] = useState('digital')
+  const [widgetClockStyle, setWidgetClockStyle] = useState('analog')
   const [weatherShowLocation, setWeatherShowLocation] = useState(true)
   const [weatherShowStats, setWeatherShowStats] = useState(true)
   const [chimeEnabled, setChimeEnabled] = useState(true)
@@ -353,7 +355,7 @@ export default function HomePage() {
     setCentralClockType(savedSettings.centralClockType || 'digital')
     setShowSeconds(savedSettings.showSeconds ?? true)
     setWidgetShowSeconds(savedSettings.widgetShowSeconds ?? true)
-    setWidgetClockStyle(savedSettings.widgetClockStyle || 'digital')
+    setWidgetClockStyle(savedSettings.widgetClockStyle || 'analog')
     setWeatherShowLocation(savedSettings.weatherShowLocation ?? true)
     setWeatherShowStats(savedSettings.weatherShowStats ?? true)
     setChimeEnabled(savedSettings.chimeEnabled ?? true)
@@ -437,10 +439,10 @@ export default function HomePage() {
         if (data.pomodoroActivities) localStorage.setItem("pomodoroActivities", data.pomodoroActivities)
         if (data.youtube) localStorage.setItem("comfy-homescreen-youtube", data.youtube)
         
-        toast.success("Configuración importada exitosamente. Recargando...")
+        toast.success(t.toast.importSuccess)
         setTimeout(() => window.location.reload(), 1500)
       } catch (err) {
-        toast.error("Error al importar: archivo inválido")
+        toast.error(t.toast.importError)
       }
     }
     reader.readAsText(file)
@@ -517,7 +519,7 @@ export default function HomePage() {
     month: "long",
     day: "numeric",
   }
-  const formattedDate = currentTime.toLocaleDateString("es-ES", dateOptions)
+  const formattedDate = currentTime.toLocaleDateString(t.dateLocale, dateOptions)
 
   const cardClass = isNightMode
     ? "p-4 bg-black/60 backdrop-blur-sm border-border/50 transition-colors duration-500"
@@ -565,7 +567,7 @@ export default function HomePage() {
           animationDelay={100 + index * 50}
           isOverlay={isOverlay}
         >
-          <FocusLauncherWidget onFocusToggle={state.handleFocusToggle} />
+          <FocusLauncherWidget onFocusToggle={state.handleFocusToggle} label={t.focus.enter} />
         </DraggableWidget>
       )
     }
@@ -605,7 +607,7 @@ export default function HomePage() {
   if (!mounted) {
     return (
       <div className="min-h-screen animated-bg flex items-center justify-center">
-        <div className="text-primary text-2xl font-mono animate-pulse">Cargando...</div>
+        <div className="text-primary text-2xl font-mono animate-pulse">{t.loading}</div>
       </div>
     )
   }
@@ -631,14 +633,14 @@ export default function HomePage() {
           <button
             onClick={() => setHideSidebars(!hideSidebars)}
             className="px-4 py-2 bg-card/80 backdrop-blur-md border border-border rounded-full shadow-lg hover:scale-105 transition-transform group flex items-center justify-center"
-            title={hideSidebars ? "Mostrar paneles laterales" : "Ocultar paneles laterales"}
+            title={hideSidebars ? t.settings.showSidebars : t.settings.hideSidebars}
           >
             {hideSidebars ? <LayoutTemplate className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" /> : <EyeOff className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />}
           </button>
           <button
             onClick={() => setIsDrawerOpen(true)}
             className="px-4 py-2 bg-card/80 backdrop-blur-md border border-border rounded-full shadow-lg hover:scale-105 transition-transform group flex items-center justify-center"
-            title="Ajustes y Personalización"
+            title={t.settings.settingsTitle}
           >
             <Settings2 className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
           </button>
@@ -650,9 +652,9 @@ export default function HomePage() {
         <button
           onClick={() => setIsCustomizationMode(false)}
           className="absolute top-6 right-6 px-4 py-2 bg-primary text-primary-foreground backdrop-blur-md border border-border rounded-full shadow-lg hover:scale-105 transition-transform z-50 group flex items-center gap-2"
-          title="Terminar Edición"
+          title={t.settings.finishEditing}
         >
-          <Check className="w-5 h-5" /> Terminar Edición
+          <Check className="w-5 h-5" /> {t.settings.finishEditing}
         </button>
       )}
 
@@ -663,10 +665,10 @@ export default function HomePage() {
             <DrawerHeader className="px-0 pt-0 pb-2 border-b border-border/50 flex flex-row items-center justify-between flex-shrink-0">
               <div>
                 <DrawerTitle className="text-xl flex items-center gap-2">
-                  <Settings2 className="w-5 h-5 text-primary" /> Personalización
+                  <Settings2 className="w-5 h-5 text-primary" /> {t.settings.title}
                 </DrawerTitle>
                 <DrawerDescription>
-                  Configura el aspecto visual, añade widgets o reordénalos.
+                  {t.settings.description}
                 </DrawerDescription>
               </div>
               <button
@@ -676,15 +678,44 @@ export default function HomePage() {
                 }}
                 className="px-4 py-2 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors flex items-center gap-2 font-medium text-sm shadow-sm whitespace-nowrap flex-shrink-0"
               >
-                <LayoutTemplate className="w-4 h-4" /> Editar Widgets
+                <LayoutTemplate className="w-4 h-4" /> {t.settings.editWidgets}
               </button>
             </DrawerHeader>
 
             <div className="flex flex-col gap-6 overflow-y-auto flex-1 pb-6 mt-6">
 
+          {/* Language Switch */}
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <Palette className="w-3 h-3" /> Temas (Ajustados al Fondo)
+              <span className="text-base">🌐</span> {t.settings.language}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setLang('es')}
+                className={`flex items-center gap-2 flex-1 px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
+                  lang === 'es'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-secondary text-secondary-foreground border-transparent hover:bg-secondary/80'
+                }`}
+              >
+                <span className="text-base">🇦🇷</span> Español
+              </button>
+              <button
+                onClick={() => setLang('en')}
+                className={`flex items-center gap-2 flex-1 px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
+                  lang === 'en'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-secondary text-secondary-foreground border-transparent hover:bg-secondary/80'
+                }`}
+              >
+                <span className="text-base">🇺🇸</span> English
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <Palette className="w-3 h-3" /> {t.settings.themes}
             </div>
             <div className="flex gap-2 flex-wrap">
               {currentThemes.map((theme) => (
@@ -699,7 +730,7 @@ export default function HomePage() {
             </div>
             {backgroundType === 'particles' && (
               <div className="mt-2">
-                <div className="text-xs text-muted-foreground mb-1.5">Color de Partículas y Fondo</div>
+                <div className="text-xs text-muted-foreground mb-1.5">{t.settings.particleColors}</div>
                 <div className="flex flex-wrap gap-2">
                   {[
                     { label: 'Azul',    value: '80, 160, 255',  bg: '#00050f' },
@@ -726,7 +757,7 @@ export default function HomePage() {
 
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <ImageIcon className="w-3 h-3" /> Fondos
+              <ImageIcon className="w-3 h-3" /> {t.settings.backgrounds}
             </div>
             <div className="grid grid-cols-3 gap-2">
               {backgroundOptions.map((bg) => (
@@ -738,7 +769,7 @@ export default function HomePage() {
                     : "bg-secondary text-secondary-foreground border-transparent hover:bg-secondary/80"
                     }`}
                 >
-                  {bg.name}
+                  {t.backgrounds[bg.id] || bg.name}
                 </button>
               ))}
             </div>
@@ -747,7 +778,7 @@ export default function HomePage() {
 
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <Clock className="w-3 h-3" /> Tipo de Reloj Central
+              <Clock className="w-3 h-3" /> {t.settings.centralClockType}
             </div>
             <div className="grid grid-cols-3 gap-2">
               <button
@@ -757,7 +788,7 @@ export default function HomePage() {
                   : "bg-secondary text-secondary-foreground border-transparent hover:bg-secondary/80"
                   }`}
               >
-                <Monitor className="w-3 h-3" /> Digital
+                <Monitor className="w-3 h-3" /> {t.settings.digital}
               </button>
               <button
                 onClick={() => handleClockTypeChange('analog')}
@@ -766,7 +797,7 @@ export default function HomePage() {
                   : "bg-secondary text-secondary-foreground border-transparent hover:bg-secondary/80"
                   }`}
               >
-                <Clock className="w-3 h-3" /> Analógico
+                <Clock className="w-3 h-3" /> {t.settings.analog}
               </button>
               <button
                 onClick={() => handleClockTypeChange('hidden')}
@@ -775,14 +806,14 @@ export default function HomePage() {
                   : "bg-secondary text-secondary-foreground border-transparent hover:bg-secondary/80"
                   }`}
               >
-                <EyeOff className="w-3 h-3" /> Oculto
+                <EyeOff className="w-3 h-3" /> {t.settings.hidden}
               </button>
             </div>
           </div>
 
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <Clock className="w-3 h-3" /> Estilo de Widget Reloj
+              <Clock className="w-3 h-3" /> {t.settings.widgetClockStyle}
             </div>
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -792,7 +823,7 @@ export default function HomePage() {
                   : "bg-secondary text-secondary-foreground border-transparent hover:bg-secondary/80"
                   }`}
               >
-                <Monitor className="w-3 h-3" /> Digital
+                <Monitor className="w-3 h-3" /> {t.settings.digital}
               </button>
               <button
                 onClick={() => {setWidgetClockStyle('analog'); saveSettings({ widgetClockStyle: 'analog' })}}
@@ -801,24 +832,24 @@ export default function HomePage() {
                   : "bg-secondary text-secondary-foreground border-transparent hover:bg-secondary/80"
                   }`}
               >
-                <Clock className="w-3 h-3" /> Analógico
+                <Clock className="w-3 h-3" /> {t.settings.analog}
               </button>
             </div>
           </div>
 
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <Bell className="w-3 h-3" /> Sonido por Hora
+              <Bell className="w-3 h-3" /> {t.settings.hourlyChime}
             </div>
             <div className="flex flex-col gap-3 bg-secondary/30 p-3 rounded-lg border border-border">
               <div className="flex items-center justify-between">
-                <span className="text-xs">Activado</span>
+                <span className="text-xs">{t.settings.enabled}</span>
                 <Switch checked={chimeEnabled} onCheckedChange={(v) => { setChimeEnabled(v); saveSettings({ chimeEnabled: v }) }} />
               </div>
               {chimeEnabled && (
                 <>
                   <div className="flex flex-col gap-1">
-                    <span className="text-xs text-muted-foreground">Sonido</span>
+                    <span className="text-xs text-muted-foreground">{t.settings.sound}</span>
                     <div className="flex gap-1">
                       {[['chime', 'Campana'], ['bell', 'Timbre'], ['digital', 'Digital']].map(([val, lbl]) => (
                         <div key={val} className="flex-1 flex gap-0.5">
@@ -837,13 +868,13 @@ export default function HomePage() {
                   <div className="flex gap-3">
                     <TimePicker
                       id="chime-silent-from"
-                      label="Silencio desde"
+                      label={t.settings.silenceFrom}
                       value={`${String(chimeSilentFrom).padStart(2,'0')}:00`}
                       onChange={v => { const h = parseInt(v.split(':')[0]); setChimeSilentFrom(h); saveSettings({ chimeSilentFrom: h }) }}
                     />
                     <TimePicker
                       id="chime-silent-to"
-                      label="Silencio hasta"
+                      label={t.settings.silenceTo}
                       value={`${String(chimeSilentTo).padStart(2,'0')}:00`}
                       onChange={v => { const h = parseInt(v.split(':')[0]); setChimeSilentTo(h); saveSettings({ chimeSilentTo: h }) }}
                     />
@@ -855,11 +886,11 @@ export default function HomePage() {
 
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <Bell className="w-3 h-3" /> Sonidos de Alarma y Timer
+              <Bell className="w-3 h-3" /> {t.settings.alarmAndTimer}
             </div>
             <div className="flex flex-col gap-2 bg-secondary/30 p-3 rounded-lg border border-border">
               <div className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">Alarma</span>
+                <span className="text-xs text-muted-foreground">{t.settings.alarm}</span>
                 <div className="flex gap-1">
                   {[['beep', 'Beep'], ['siren', 'Sirena'], ['chime', 'Campana']].map(([val, lbl]) => (
                     <div key={val} className="flex-1 flex gap-0.5">
@@ -876,7 +907,7 @@ export default function HomePage() {
                 </div>
               </div>
               <div className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">Timer</span>
+                <span className="text-xs text-muted-foreground">{t.settings.timer}</span>
                 <div className="flex gap-1">
                   {[['beep', 'Beep'], ['siren', 'Sirena'], ['chime', 'Campana']].map(([val, lbl]) => (
                     <div key={val} className="flex-1 flex gap-0.5">
@@ -897,23 +928,23 @@ export default function HomePage() {
 
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <Settings2 className="w-3 h-3" /> Ajustes de Widgets
+              <Settings2 className="w-3 h-3" /> {t.settings.widgetSettings}
             </div>
             <div className="flex flex-col gap-3 bg-secondary/30 p-3 rounded-lg border border-border">
               <div className="flex items-center justify-between">
-                <span className="text-xs">Segundos en Reloj Central</span>
+                <span className="text-xs">{t.settings.secondsCentralClock}</span>
                 <Switch checked={showSeconds} onCheckedChange={(v) => { setShowSeconds(v); saveSettings({ showSeconds: v }) }} />
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs">Segundos en Widget Reloj</span>
+                <span className="text-xs">{t.settings.secondsWidgetClock}</span>
                 <Switch checked={widgetShowSeconds} onCheckedChange={(v) => { setWidgetShowSeconds(v); saveSettings({ widgetShowSeconds: v }) }} />
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs">Mostrar Ubicación (Clima)</span>
+                <span className="text-xs">{t.settings.showLocation}</span>
                 <Switch checked={weatherShowLocation} onCheckedChange={(v) => { setWeatherShowLocation(v); saveSettings({ weatherShowLocation: v }) }} />
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs">Mostrar Detalles (Clima)</span>
+                <span className="text-xs">{t.settings.showDetails}</span>
                 <Switch checked={weatherShowStats} onCheckedChange={(v) => { setWeatherShowStats(v); saveSettings({ weatherShowStats: v }) }} />
               </div>
             </div>
@@ -921,7 +952,7 @@ export default function HomePage() {
 
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <Plus className="w-4 h-4" /> Agregar Widget
+                  <Plus className="w-4 h-4" /> {t.settings.addWidget}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {availableWidgets.length > 0 ? availableWidgets.map(widgetId => (
@@ -930,27 +961,27 @@ export default function HomePage() {
                       onClick={() => handleAddWidget(widgetId)}
                       className="text-xs px-3 py-1.5 rounded-full border border-primary/30 bg-primary/10 hover:bg-primary hover:text-primary-foreground transition-colors capitalize flex items-center gap-1"
                     >
-                      <Plus className="w-3 h-3" /> {widgetId.replace('-', ' ')}
+                      <Plus className="w-3 h-3" /> {t.widgets[widgetId] || widgetId.replace('-', ' ')}
                     </button>
                   )) : (
-                    <span className="text-xs text-muted-foreground italic">Todos los widgets en uso</span>
+                    <span className="text-xs text-muted-foreground italic">{t.settings.allWidgetsUsed}</span>
                   )}
                 </div>
               </div>
 
               <div className="space-y-2 pt-4 border-t border-border">
                 <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                  <Settings2 className="w-3 h-3" /> Datos
+                  <Settings2 className="w-3 h-3" /> {t.settings.data}
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={handleExportData}
                     className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/80 py-2 rounded-md flex items-center justify-center gap-2 transition-colors text-xs font-medium"
                   >
-                    <Download className="w-3 h-3" /> Exportar
+                    <Download className="w-3 h-3" /> {t.settings.export}
                   </button>
                   <label className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/80 py-2 rounded-md flex items-center justify-center gap-2 transition-colors text-xs font-medium cursor-pointer mb-0">
-                    <Upload className="w-3 h-3" /> Importar
+                    <Upload className="w-3 h-3" /> {t.settings.import}
                     <input type="file" accept=".json" className="hidden" onChange={handleImportData} />
                   </label>
                 </div>
@@ -1018,7 +1049,8 @@ export default function HomePage() {
                       src={`https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`}
                       title="YouTube video player"
                       frameBorder="0"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                      allowFullScreen
                       className={isFullscreenViewport ? "w-full h-full" : "absolute inset-0 w-full h-full"}
                     ></iframe>
                   </div>
@@ -1078,7 +1110,7 @@ export default function HomePage() {
           <div className="w-full max-w-5xl flex flex-col min-h-[80vh] items-center">
             <div className="w-full flex items-center justify-between mb-10 px-8">
               <button onClick={() => setIsFocusMode(false)} className="px-5 py-2.5 border border-border bg-card/80 backdrop-blur-md rounded-full text-muted-foreground hover:text-foreground hover:bg-card transition-colors flex items-center gap-2 shadow-sm">
-                <ArrowLeft className="w-4 h-4" /> Salir del Modo Focus
+                <ArrowLeft className="w-4 h-4" /> {t.focus.exit}
               </button>
 
               <div className="text-3xl font-mono font-bold text-foreground">
@@ -1088,7 +1120,7 @@ export default function HomePage() {
               <div className="flex items-center gap-3">
                 <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
                 <div className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                  Focus Activo
+                  {t.focus.active}
                 </div>
               </div>
             </div>

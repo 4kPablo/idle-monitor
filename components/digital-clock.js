@@ -6,8 +6,10 @@ import { toast } from "sonner"
 import AnalogClock from "./analog-clock"
 import { playAlarmSound } from "./hourly-chime"
 import TimePicker from "./shadcn-studio/date-picker/date-picker-09"
+import { useLanguage } from "@/lib/language-context"
 
 export default function DigitalClockWidget({ time, showSeconds = true, clockStyle = "digital", alarmSoundType = "beep", timerSoundType = "beep" }) {
+    const { lang, t } = useLanguage()
     const [mode, setMode] = useState("clock") // clock, alarm, timer, stopwatch
 
     const [alarmTime, setAlarmTime] = useState("00:00")
@@ -30,11 +32,12 @@ export default function DigitalClockWidget({ time, showSeconds = true, clockStyl
             playAlarmSound(soundType)
             alarmIntervalRef.current = setInterval(() => playAlarmSound(soundType), 2000)
 
-            toast("¡Tiempo completado!", {
+            const msg = mode === "alarm" ? t.clock.alarmRing : t.clock.timerDone
+            toast(msg, {
                 id: "alarm-toast",
                 duration: Infinity,
                 action: {
-                    label: "Apagar Alarma",
+                    label: t.clock.stopAlarm || "Apagar Alarma",
                     onClick: () => {
                         if (alarmIntervalRef.current) {
                             clearInterval(alarmIntervalRef.current)
@@ -139,7 +142,7 @@ export default function DigitalClockWidget({ time, showSeconds = true, clockStyl
                     <button
                         onClick={() => { if (alarmTime) setAlarmActive(!alarmActive) }}
                         className={`p-2 rounded-full transition-colors flex-shrink-0 ${alarmActive ? 'bg-destructive text-destructive-foreground' : 'bg-primary text-primary-foreground'}`}
-                        title={alarmActive ? 'Desactivar Alarma' : 'Activar Alarma'}
+                        title={alarmActive ? (t.clock.deactivateAlarm || 'Desactivar Alarma') : (t.clock.activateAlarm || 'Activar Alarma')}
                     >
                         {alarmActive ? <AlarmClock className="w-4 h-4" /> : <Check className="w-4 h-4" />}
                     </button>
@@ -158,9 +161,10 @@ export default function DigitalClockWidget({ time, showSeconds = true, clockStyl
                                 showSeconds={true}
                                 label=""
                             />
-                            <button
+                             <button
                                 onClick={() => { updateTimerFromInputs(inputMinutes, inputSeconds); if (inputMinutes || inputSeconds) setTimerActive(true) }}
                                 className="p-2 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 flex-shrink-0"
+                                title={t.clock.start}
                             >
                                 <Play className="w-4 h-4 ml-0.5" />
                             </button>
@@ -169,10 +173,10 @@ export default function DigitalClockWidget({ time, showSeconds = true, clockStyl
                         <>
                             <div className="font-mono text-3xl font-bold tracking-tight text-primary">{formatSecs(timerSeconds)}</div>
                             <div className="flex gap-2">
-                                <button onClick={() => setTimerActive(!timerActive)} className="p-2 bg-primary/10 text-primary rounded-full hover:bg-primary/20">
+                                <button onClick={() => setTimerActive(!timerActive)} className="p-2 bg-primary/10 text-primary rounded-full hover:bg-primary/20" title={timerActive ? t.clock.stop : t.clock.start}>
                                     {timerActive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
                                 </button>
-                                <button onClick={() => { setTimerActive(false); updateTimerFromInputs(inputMinutes, inputSeconds) }} className="p-2 bg-secondary text-muted-foreground rounded-full hover:bg-secondary/80">
+                                <button onClick={() => { setTimerActive(false); updateTimerFromInputs(inputMinutes, inputSeconds) }} className="p-2 bg-secondary text-muted-foreground rounded-full hover:bg-secondary/80" title={t.clock.reset}>
                                     <RotateCcw className="w-4 h-4" />
                                 </button>
                             </div>
@@ -185,10 +189,10 @@ export default function DigitalClockWidget({ time, showSeconds = true, clockStyl
                 <div className="flex flex-col items-center gap-2 w-full px-4">
                     <div className="font-mono text-3xl font-bold tracking-tight text-primary">{formatSecs(stopwatchSeconds)}</div>
                     <div className="flex gap-2">
-                        <button onClick={() => setStopwatchActive(!stopwatchActive)} className="p-2 bg-primary/10 text-primary rounded-full hover:bg-primary/20">
+                        <button onClick={() => setStopwatchActive(!stopwatchActive)} className="p-2 bg-primary/10 text-primary rounded-full hover:bg-primary/20" title={stopwatchActive ? t.clock.stop : t.clock.start}>
                             {stopwatchActive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
                         </button>
-                        <button onClick={() => { setStopwatchActive(false); setStopwatchSeconds(0) }} className="p-2 bg-secondary text-muted-foreground rounded-full hover:bg-secondary/80">
+                        <button onClick={() => { setStopwatchActive(false); setStopwatchSeconds(0) }} className="p-2 bg-secondary text-muted-foreground rounded-full hover:bg-secondary/80" title={t.clock.reset}>
                             <RotateCcw className="w-4 h-4" />
                         </button>
                     </div>
@@ -205,7 +209,13 @@ export default function DigitalClockWidget({ time, showSeconds = true, clockStyl
                     {mode === "alarm" && <AlarmClock className="w-4 h-4" />}
                     {mode === "timer" && <Timer className="w-4 h-4" />}
                     {mode === "stopwatch" && <TimerReset className="w-4 h-4" />}
-                    <span className="capitalize hidden sm:inline">{mode === 'clock' ? 'Reloj' : mode === 'stopwatch' ? 'Cronómetro' : mode}</span>
+                    <span className="capitalize hidden sm:inline">
+                        {mode === 'clock' ? t.widgets.clock :
+                         mode === 'alarm' ? t.clock.alarm :
+                         mode === 'timer' ? t.clock.timer :
+                         mode === 'stopwatch' ? t.pomodoro.stopwatch :
+                         mode}
+                    </span>
                 </h3>
                 <div className="flex gap-1 bg-secondary/30 rounded p-0.5 ml-auto">
                     <button onClick={() => setMode('clock')} className={`p-1 rounded transition-colors ${mode === 'clock' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}><Clock className="w-3 h-3" /></button>

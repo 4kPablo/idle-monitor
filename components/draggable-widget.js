@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card"
 import { GripVertical, X } from "lucide-react"
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useLanguage } from "@/lib/language-context"
 
 export default function DraggableWidget({
   id,
@@ -14,6 +15,7 @@ export default function DraggableWidget({
   animationDelay,
   isOverlay = false
 }) {
+  const { lang } = useLanguage()
   const {
     attributes,
     listeners,
@@ -56,7 +58,7 @@ export default function DraggableWidget({
               {...(isOverlay ? {} : attributes)}
               {...(isOverlay ? {} : listeners)}
               className={`absolute top-2 left-2 duration-200 cursor-grab active:cursor-grabbing p-1.5 rounded-md hover:bg-secondary/80 bg-secondary/40 backdrop-blur-sm z-20 shadow-sm ${isOverlay ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 transition-opacity'}`}
-              title="Arrastrar para mover"
+              title={lang === 'es' ? "Arrastrar para mover" : "Drag to move"}
             >
               <GripVertical className="w-4 h-4 text-foreground" />
             </div>
@@ -64,7 +66,7 @@ export default function DraggableWidget({
               <button
                 onClick={() => onRemove(id)}
                 className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-pointer p-1.5 rounded-md hover:bg-destructive/90 bg-destructive/50 backdrop-blur-sm text-white z-20 shadow-sm"
-                title="Eliminar widget"
+                title={lang === 'es' ? "Eliminar widget" : "Remove widget"}
               >
                 <X className="w-4 h-4" />
               </button>

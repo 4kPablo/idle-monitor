@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from "react"
 import { Volume2, VolumeX, Coffee, TreePine, Brain, Zap, Cpu } from "lucide-react"
 import { Slider } from "@/components/ui/slider"
+import { useLanguage } from "@/lib/language-context"
 
 // ─── Brown noise buffer generator ───────────────────────────────────────────
 function fillBrownNoise(data) {
@@ -69,6 +70,7 @@ const SOUNDS = [
 
 // ─── Component ───────────────────────────────────────────────────────────────
 const AmbientSounds = forwardRef((props, ref) => {
+  const { lang, t } = useLanguage()
   const [activeSound, setActiveSound] = useState(null)
   const [volume, setVolume] = useState(0.5)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -243,7 +245,7 @@ const AmbientSounds = forwardRef((props, ref) => {
           ? <Volume2 className="w-4 h-4 text-muted-foreground" />
           : <VolumeX className="w-4 h-4 text-muted-foreground" />
         }
-        <h3 className="text-sm font-medium text-muted-foreground">Ambiente</h3>
+        <h3 className="text-sm font-medium text-muted-foreground">{t.ambient.title}</h3>
       </div>
 
       {/* Sound buttons */}
@@ -251,12 +253,15 @@ const AmbientSounds = forwardRef((props, ref) => {
         {SOUNDS.map((sound) => {
           const Icon = sound.icon
           const isActive = activeSound === sound.id
+          const label = t.ambient[sound.id] || sound.label
+          const subtitle = t.ambient[sound.id + "Sub"] || sound.subtitle
+          const binauralHint = sound.type === "binaural" ? (lang === 'es' ? "\n🎧 Mejor con auriculares" : "\n🎧 Better with headphones") : ""
           return (
             <button
               key={sound.id}
               type="button"
               onClick={() => playSound(sound)}
-              title={`${sound.label} — ${sound.subtitle}${sound.type === "binaural" ? "\n🎧 Mejor con auriculares" : ""}`}
+              title={`${label} — ${subtitle}${binauralHint}`}
               className={`
                 flex flex-col items-center justify-center p-2 rounded-lg transition-all duration-200 cursor-pointer
                 ${isActive
@@ -274,7 +279,7 @@ const AmbientSounds = forwardRef((props, ref) => {
       {/* Headphones hint for binaural */}
       {activeSound && SOUNDS.find(s => s.id === activeSound)?.type === "binaural" && (
         <p className="text-[10px] text-muted-foreground/60 text-center">
-          🎧 Mejor efecto con auriculares
+          {t.ambient.headphones}
         </p>
       )}
 

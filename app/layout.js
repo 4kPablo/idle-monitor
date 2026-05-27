@@ -1,5 +1,6 @@
 import './globals.css'
 import { ThemeProvider } from "@/components/theme-provider"
+import { LanguageProvider } from "@/lib/language-context"
 
 export const metadata = {
   title: "Comfy Homescreen",
@@ -54,14 +55,16 @@ export default function RootLayout({ children }) {
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className={`font-sans antialiased`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-        </ThemeProvider>
+        <LanguageProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="dark"
+            enableSystem
+            disableTransitionOnChange
+          >
+            {children}
+          </ThemeProvider>
+        </LanguageProvider>
       </body>
     </html>
   )
