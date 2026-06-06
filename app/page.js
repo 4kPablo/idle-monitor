@@ -18,17 +18,16 @@ import DraggableWidget from "@/components/draggable-widget"
 import QuickLinks from "@/components/quick-links"
 import TaskList from "@/components/task-list"
 import AiNewsSummary from "@/components/ai-news-summary"
+import GlobalTimerIndicator from "@/components/global-timer-indicator"
 import { getWidgetLayout, saveWidgetLayout, moveWidget } from "@/lib/widget-store"
 import { getSettings, saveSettings } from "@/lib/settings-store"
 import { useLanguage } from "@/lib/language-context"
-import { Settings2, Check, Palette, X, Image as ImageIcon, ArrowLeft, Focus, Maximize, Minimize, Plus, Clock, Monitor, EyeOff, LayoutTemplate, Download, Upload, Bell, Play } from "lucide-react"
-import { Switch } from "@/components/ui/switch"
+import { Settings2, Check, X, Focus, Maximize, Minimize, EyeOff, LayoutTemplate, Volume2, VolumeX } from "lucide-react"
 import DigitalClockWidget from "@/components/digital-clock"
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from "@/components/ui/drawer"
 import { Toaster } from "@/components/ui/sonner"
 import { toast } from "sonner"
-import { playChimeSound, playAlarmSound } from "@/components/hourly-chime"
-import TimePicker from "@/components/shadcn-studio/date-picker/date-picker-09"
+import { THEME_CONFIG } from "@/lib/themes"
+import SettingsDrawer from "@/components/settings-drawer"
 import {
   DndContext,
   closestCenter,
@@ -117,7 +116,7 @@ const EMPTY_PROPS = {}
 const widgetComponents = {
   "clock": { component: DigitalClockWidget, props: (state) => ({ time: state.currentTime, showSeconds: state.widgetShowSeconds, clockStyle: state.widgetClockStyle, alarmSoundType: state.alarmSoundType, timerSoundType: state.timerSoundType }) },
   "calendar": { component: MonthCalendar, props: (state) => ({ currentDate: state.currentTime, pomodoroRefresh: state.pomodoroRefresh }) },
-  "ambient": { component: AmbientSounds, props: (state) => ({ ref: state.ambientRef }) },
+  "ambient": { component: AmbientSounds, props: () => ({}) },
   "weather": { component: WeatherWidget, props: (state) => ({ showLocation: state.weatherShowLocation, showStats: state.weatherShowStats }) },
   "pomodoro": { component: PomodoroTimer, props: (state) => ({ onPomodoroComplete: state.handlePomodoroComplete, onFocusToggle: state.handleFocusToggle, onPomodoroActive: state.handlePomodoroActive, isFocusMode: state.isFocusMode }) },
   "tech-news": { component: TechNews, props: () => EMPTY_PROPS },
@@ -136,59 +135,6 @@ const widgetComponents = {
   "task-list": { component: TaskList, props: () => EMPTY_PROPS },
   "ai-news": { component: AiNewsSummary, props: () => EMPTY_PROPS },
 }
-
-// Configuración de Temas por Fondo
-const THEME_CONFIG = {
-  'particles': [
-    { name: "Azul", primary: "oklch(0.65 0.18 220)", accent: "oklch(0.7 0.2 180)" },
-    { name: "Púrpura", primary: "oklch(0.65 0.25 300)", accent: "oklch(0.7 0.2 280)" },
-    { name: "Esmeralda", primary: "oklch(0.7 0.2 160)", accent: "oklch(0.75 0.22 150)" },
-    { name: "Rosa", primary: "oklch(0.7 0.2 340)", accent: "oklch(0.75 0.22 330)" },
-  ],
-  'gradient-aurora': [
-    { name: "Cyber", primary: "oklch(0.6 0.15 240)", accent: "oklch(0.7 0.25 160)" },
-    { name: "Neon", primary: "oklch(0.65 0.25 310)", accent: "oklch(0.7 0.2 280)" },
-    { name: "Glacier", primary: "oklch(0.75 0.1 200)", accent: "oklch(0.8 0.1 190)" },
-    { name: "Fuego", primary: "oklch(0.65 0.22 30)", accent: "oklch(0.7 0.25 20)" },
-  ],
-  'gradient-forest': [
-    { name: "Verde", primary: "oklch(0.8 0.15 145)", accent: "oklch(0.75 0.2 130)" },
-    { name: "Coral", primary: "oklch(0.75 0.15 25)", accent: "oklch(0.8 0.2 15)" },
-    { name: "Ámbar", primary: "oklch(0.8 0.18 70)", accent: "oklch(0.85 0.2 60)" },
-    { name: "Lavanda", primary: "oklch(0.75 0.12 290)", accent: "oklch(0.8 0.15 280)" },
-  ],
-  'grid': [
-    { name: "Vapor", primary: "oklch(0.65 0.25 300)", accent: "oklch(0.7 0.2 190)" },
-    { name: "Retro", primary: "oklch(0.6 0.2 20)", accent: "oklch(0.8 0.3 350)" },
-    { name: "Cyan", primary: "oklch(0.7 0.2 200)", accent: "oklch(0.75 0.22 190)" },
-    { name: "Lime", primary: "oklch(0.75 0.2 130)", accent: "oklch(0.8 0.22 120)" },
-  ],
-  'space': [
-    { name: "Sci-Fi", primary: "oklch(0.7 0.05 240)", accent: "oklch(0.8 0.1 200)" },
-    { name: "Void", primary: "oklch(0.8 0 0)", accent: "oklch(0.6 0.2 260)" },
-    { name: "Nebula", primary: "oklch(0.65 0.2 310)", accent: "oklch(0.7 0.22 300)" },
-    { name: "Stellar", primary: "oklch(0.7 0.18 180)", accent: "oklch(0.75 0.2 170)" },
-  ],
-  'solid': [
-    { name: "OLED", primary: "#ffffff", accent: "#888888", bg: "#000000" },
-    { name: "Azul", primary: "#3b82f6", accent: "#60a5fa", bg: "#1e293b" },
-    { name: "Verde", primary: "#10b981", accent: "#34d399", bg: "#064e3b" },
-    { name: "Púrpura", primary: "#a855f7", accent: "#c084fc", bg: "#2e1065" },
-    { name: "Rosa", primary: "#ec4899", accent: "#f472b6", bg: "#500724" },
-    { name: "Naranja", primary: "#f97316", accent: "#fb923c", bg: "#431407" },
-    { name: "Cyan", primary: "#06b6d4", accent: "#22d3ee", bg: "#083344" },
-    { name: "Rojo", primary: "#ef4444", accent: "#f87171", bg: "#450a0a" },
-  ]
-}
-
-const backgroundOptions = [
-  { id: 'particles', name: 'Partículas' },
-  { id: 'gradient-aurora', name: 'Aurora' },
-  { id: 'gradient-forest', name: 'Bosque' },
-  { id: 'grid', name: 'Retro Grid' },
-  { id: 'space', name: 'Espacio' },
-  { id: 'solid', name: 'Solido' },
-]
 
 export default function HomePage() {
   const { lang, t, setLang } = useLanguage()
@@ -219,6 +165,7 @@ export default function HomePage() {
   const [timerSoundType, setTimerSoundType] = useState('beep')
   const [particleColor, setParticleColor] = useState('80, 160, 255')
   const [particleBgColor, setParticleBgColor] = useState('#00050f')
+  const [isAmbientActive, setIsAmbientActive] = useState(false)
 
   // Youtube State hoisted
   const [videoId, setVideoIdState] = useState("")
@@ -364,8 +311,6 @@ export default function HomePage() {
     setChimeSoundType(savedSettings.chimeSoundType || 'chime')
     setAlarmSoundType(savedSettings.alarmSoundType || 'beep')
     setTimerSoundType(savedSettings.timerSoundType || 'beep')
-    setParticleColor(savedSettings.particleColor || '80, 160, 255')
-    setParticleBgColor(savedSettings.particleBgColor || '#00050f')
 
     // Apply saved theme
     const themes = THEME_CONFIG[savedSettings.backgroundType] || THEME_CONFIG['particles']
@@ -399,55 +344,15 @@ export default function HomePage() {
     if (ambientRef.current) {
       if (active) {
         ambientRef.current.autoPlay()
+        setIsAmbientActive(true)
       } else {
         ambientRef.current.autoPause()
+        setIsAmbientActive(false)
       }
     }
   }, [])
 
-  const handleExportData = () => {
-    const data = {
-      settings: getSettings(),
-      layout: getWidgetLayout(),
-      pomodoro: localStorage.getItem('homescreen_pomodoros'),
-      pomodoroActivityModes: localStorage.getItem('pomodoroActivityModes'),
-      pomodoroActivities: localStorage.getItem('pomodoroActivities'),
-      youtube: localStorage.getItem('comfy-homescreen-youtube')
-    }
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = "comfy-homescreen-backup.json"
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  }
-
-  const handleImportData = (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      try {
-        const data = JSON.parse(event.target.result)
-        if (data.settings) localStorage.setItem("comfy-homescreen-settings", JSON.stringify(data.settings))
-        if (data.layout) localStorage.setItem("comfy-homescreen-widget-layout", JSON.stringify(data.layout))
-        if (data.pomodoro) localStorage.setItem("homescreen_pomodoros", data.pomodoro)
-        if (data.pomodoroActivityModes) localStorage.setItem("pomodoroActivityModes", data.pomodoroActivityModes)
-        if (data.pomodoroActivities) localStorage.setItem("pomodoroActivities", data.pomodoroActivities)
-        if (data.youtube) localStorage.setItem("comfy-homescreen-youtube", data.youtube)
-        
-        toast.success(t.toast.importSuccess)
-        setTimeout(() => window.location.reload(), 1500)
-      } catch (err) {
-        toast.error(t.toast.importError)
-      }
-    }
-    reader.readAsText(file)
-  }
-
+ 
   const handleRemoveWidget = useCallback((widgetId) => {
     const newLayout = {
       left: layout.left.filter(id => id !== widgetId),
@@ -459,29 +364,20 @@ export default function HomePage() {
 
   const handleAddWidget = useCallback((widgetId) => {
     const targetColumn = layout.left.length <= layout.right.length ? "left" : "right"
-    const newLayout = {
-      ...layout,
-      [targetColumn]: [...layout[targetColumn], widgetId]
-    }
+    const newLayout = { ...layout, [targetColumn]: [...layout[targetColumn], widgetId] }
     setLayout(newLayout)
     saveWidgetLayout(newLayout)
   }, [layout])
-
-  const handleClockTypeChange = (type) => {
-    setCentralClockType(type)
-    saveSettings({ centralClockType: type })
-  }
 
   const applyTheme = (theme, shouldSave = true) => {
     document.documentElement.style.setProperty('--primary', theme.primary)
     document.documentElement.style.setProperty('--accent', theme.accent)
     document.documentElement.style.setProperty('--ring', theme.primary)
-    // Ensure legible text on primary-colored buttons
     const isLight = theme.primary === '#ffffff' || theme.primary === 'white'
     document.documentElement.style.setProperty('--primary-foreground', isLight ? '#000000' : '')
-    if (theme.bg) {
-      setCustomBgColor(theme.bg)
-    }
+    if (theme.bg) setCustomBgColor(theme.bg)
+    if (theme.particleColor) setParticleColor(theme.particleColor)
+    if (theme.particleBg) setParticleBgColor(theme.particleBg)
 
     if (shouldSave) {
       saveSettings({
@@ -494,22 +390,6 @@ export default function HomePage() {
   }
 
 
-
-  // Auto-switch theme when background changes
-  const handleBackgroundChange = (type) => {
-    setBackgroundType(type)
-    const allowedThemes = THEME_CONFIG[type] || THEME_CONFIG['particles']
-    if (allowedThemes.length > 0) {
-      const defaultTheme = allowedThemes[0]
-      applyTheme(defaultTheme, false)
-      saveSettings({
-        backgroundType: type,
-        themeName: defaultTheme.name,
-        customBgColor: defaultTheme.bg || customBgColor,
-        centralClockType: centralClockType
-      })
-    }
-  }
 
   const hours = currentTime.getHours().toString().padStart(2, "0")
   const minutes = currentTime.getMinutes().toString().padStart(2, "0")
@@ -602,8 +482,6 @@ export default function HomePage() {
     }
   }
 
-  const currentThemes = THEME_CONFIG[backgroundType] || THEME_CONFIG['particles']
-
   if (!mounted) {
     return (
       <div className="min-h-screen animated-bg flex items-center justify-center">
@@ -611,10 +489,6 @@ export default function HomePage() {
       </div>
     )
   }
-
-  const availableWidgets = Object.keys(widgetComponents).filter(
-    id => id !== "progress" && !layout.left.includes(id) && !layout.right.includes(id)
-  )
 
   return (
     <div
@@ -625,10 +499,12 @@ export default function HomePage() {
     >
       {renderBackground()}
       <Toaster />
+      <GlobalTimerIndicator />
+      <div className="hidden"><AmbientSounds ref={ambientRef} /></div>
       <HourlyChime currentTime={currentTime} enabled={chimeEnabled} silentFrom={chimeSilentFrom} silentTo={chimeSilentTo} soundType={chimeSoundType} onChime={handleHourlyChime} />
 
       {/* Buttons to toggle Drawer and Sidebars */}
-      {!isCustomizationMode && !isFullscreenViewport && (
+      {!isCustomizationMode && !isFullscreenViewport && !isFocusMode && (
         <div className={`absolute top-6 right-6 flex items-center gap-4 transition-all duration-500 z-50 ${showUI ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4 pointer-events-none"}`}>
           <button
             onClick={() => setHideSidebars(!hideSidebars)}
@@ -658,343 +534,34 @@ export default function HomePage() {
         </button>
       )}
 
-      {/* Settings Drawer */}
-      <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen} direction="right">
-        <DrawerContent className="sm:max-w-md w-full h-full border-l">
-          <div className="mx-auto w-full max-w-3xl p-6 flex flex-col h-full overflow-hidden">
-            <DrawerHeader className="px-0 pt-0 pb-2 border-b border-border/50 flex flex-row items-center justify-between flex-shrink-0">
-              <div>
-                <DrawerTitle className="text-xl flex items-center gap-2">
-                  <Settings2 className="w-5 h-5 text-primary" /> {t.settings.title}
-                </DrawerTitle>
-                <DrawerDescription>
-                  {t.settings.description}
-                </DrawerDescription>
-              </div>
-              <button
-                onClick={() => {
-                  setIsDrawerOpen(false)
-                  setIsCustomizationMode(true)
-                }}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors flex items-center gap-2 font-medium text-sm shadow-sm whitespace-nowrap flex-shrink-0"
-              >
-                <LayoutTemplate className="w-4 h-4" /> {t.settings.editWidgets}
-              </button>
-            </DrawerHeader>
-
-            <div className="flex flex-col gap-6 overflow-y-auto flex-1 pb-6 mt-6">
-
-          {/* Language Switch */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <span className="text-base">🌐</span> {t.settings.language}
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setLang('es')}
-                className={`flex items-center gap-2 flex-1 px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
-                  lang === 'es'
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'bg-secondary text-secondary-foreground border-transparent hover:bg-secondary/80'
-                }`}
-              >
-                <span className="text-base">🇦🇷</span> Español
-              </button>
-              <button
-                onClick={() => setLang('en')}
-                className={`flex items-center gap-2 flex-1 px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
-                  lang === 'en'
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'bg-secondary text-secondary-foreground border-transparent hover:bg-secondary/80'
-                }`}
-              >
-                <span className="text-base">🇺🇸</span> English
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <Palette className="w-3 h-3" /> {t.settings.themes}
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              {currentThemes.map((theme) => (
-                <button
-                  key={theme.name}
-                  onClick={() => applyTheme(theme)}
-                  className="w-8 h-8 rounded-full border-2 border-border hover:scale-110 transition-transform shadow-sm"
-                  style={{ background: theme.primary }}
-                  title={theme.name}
-                />
-              ))}
-            </div>
-            {backgroundType === 'particles' && (
-              <div className="mt-2">
-                <div className="text-xs text-muted-foreground mb-1.5">{t.settings.particleColors}</div>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { label: 'Azul',    value: '80, 160, 255',  bg: '#00050f' },
-                    { label: 'Violeta', value: '160, 100, 255', bg: '#04010d' },
-                    { label: 'Verde',   value: '60, 210, 120',  bg: '#010804' },
-                    { label: 'Rosa',    value: '255, 100, 170', bg: '#0a0105' },
-                    { label: 'Naranja', value: '255, 140, 50',  bg: '#080300' },
-                    { label: 'Cyan',    value: '50, 210, 220',  bg: '#01080a' },
-                    { label: 'Dorado',  value: '230, 180, 40',  bg: '#080600' },
-                  ].map(({ label, value, bg }) => (
-                    <button
-                      key={value}
-                      onClick={() => { setParticleColor(value); setParticleBgColor(bg); saveSettings({ particleColor: value, particleBgColor: bg }) }}
-                      className={`text-xs px-2 py-1 rounded-full border transition-all ${particleColor === value ? 'border-foreground bg-secondary' : 'border-border bg-secondary/30 hover:bg-secondary/60'}`}
-                      style={{ color: `rgb(${value})` }}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <ImageIcon className="w-3 h-3" /> {t.settings.backgrounds}
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {backgroundOptions.map((bg) => (
-                <button
-                  key={bg.id}
-                  onClick={() => handleBackgroundChange(bg.id)}
-                  className={`text-xs p-2 rounded-md border transition-all ${backgroundType === bg.id
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-secondary text-secondary-foreground border-transparent hover:bg-secondary/80"
-                    }`}
-                >
-                  {t.backgrounds[bg.id] || bg.name}
-                </button>
-              ))}
-            </div>
-          </div>
-
-
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <Clock className="w-3 h-3" /> {t.settings.centralClockType}
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                onClick={() => handleClockTypeChange('digital')}
-                className={`flex items-center justify-center gap-1 text-xs p-2 rounded-md border transition-all ${centralClockType === 'digital'
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-secondary text-secondary-foreground border-transparent hover:bg-secondary/80"
-                  }`}
-              >
-                <Monitor className="w-3 h-3" /> {t.settings.digital}
-              </button>
-              <button
-                onClick={() => handleClockTypeChange('analog')}
-                className={`flex items-center justify-center gap-1 text-xs p-2 rounded-md border transition-all ${centralClockType === 'analog'
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-secondary text-secondary-foreground border-transparent hover:bg-secondary/80"
-                  }`}
-              >
-                <Clock className="w-3 h-3" /> {t.settings.analog}
-              </button>
-              <button
-                onClick={() => handleClockTypeChange('hidden')}
-                className={`flex items-center justify-center gap-1 text-xs p-2 rounded-md border transition-all ${centralClockType === 'hidden'
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-secondary text-secondary-foreground border-transparent hover:bg-secondary/80"
-                  }`}
-              >
-                <EyeOff className="w-3 h-3" /> {t.settings.hidden}
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <Clock className="w-3 h-3" /> {t.settings.widgetClockStyle}
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => {setWidgetClockStyle('digital'); saveSettings({ widgetClockStyle: 'digital' })}}
-                className={`flex items-center justify-center gap-1 text-xs p-2 rounded-md border transition-all ${widgetClockStyle === 'digital'
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-secondary text-secondary-foreground border-transparent hover:bg-secondary/80"
-                  }`}
-              >
-                <Monitor className="w-3 h-3" /> {t.settings.digital}
-              </button>
-              <button
-                onClick={() => {setWidgetClockStyle('analog'); saveSettings({ widgetClockStyle: 'analog' })}}
-                className={`flex items-center justify-center gap-1 text-xs p-2 rounded-md border transition-all ${widgetClockStyle === 'analog'
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-secondary text-secondary-foreground border-transparent hover:bg-secondary/80"
-                  }`}
-              >
-                <Clock className="w-3 h-3" /> {t.settings.analog}
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <Bell className="w-3 h-3" /> {t.settings.hourlyChime}
-            </div>
-            <div className="flex flex-col gap-3 bg-secondary/30 p-3 rounded-lg border border-border">
-              <div className="flex items-center justify-between">
-                <span className="text-xs">{t.settings.enabled}</span>
-                <Switch checked={chimeEnabled} onCheckedChange={(v) => { setChimeEnabled(v); saveSettings({ chimeEnabled: v }) }} />
-              </div>
-              {chimeEnabled && (
-                <>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs text-muted-foreground">{t.settings.sound}</span>
-                    <div className="flex gap-1">
-                      {[['chime', 'Campana'], ['bell', 'Timbre'], ['digital', 'Digital']].map(([val, lbl]) => (
-                        <div key={val} className="flex-1 flex gap-0.5">
-                          <button onClick={() => { setChimeSoundType(val); saveSettings({ chimeSoundType: val }) }}
-                            className={`flex-1 text-xs py-1.5 rounded-l-md border transition-colors ${chimeSoundType === val ? 'bg-primary text-primary-foreground border-primary' : 'bg-secondary border-transparent hover:bg-secondary/80'}`}>
-                            {lbl}
-                          </button>
-                          <button onClick={() => playChimeSound(val)}
-                            className="px-1.5 py-1.5 bg-secondary/70 hover:bg-secondary border border-transparent rounded-r-md transition-colors text-muted-foreground hover:text-foreground" title="Escuchar">
-                            <Play className="w-2.5 h-2.5" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex gap-3">
-                    <TimePicker
-                      id="chime-silent-from"
-                      label={t.settings.silenceFrom}
-                      value={`${String(chimeSilentFrom).padStart(2,'0')}:00`}
-                      onChange={v => { const h = parseInt(v.split(':')[0]); setChimeSilentFrom(h); saveSettings({ chimeSilentFrom: h }) }}
-                    />
-                    <TimePicker
-                      id="chime-silent-to"
-                      label={t.settings.silenceTo}
-                      value={`${String(chimeSilentTo).padStart(2,'0')}:00`}
-                      onChange={v => { const h = parseInt(v.split(':')[0]); setChimeSilentTo(h); saveSettings({ chimeSilentTo: h }) }}
-                    />
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <Bell className="w-3 h-3" /> {t.settings.alarmAndTimer}
-            </div>
-            <div className="flex flex-col gap-2 bg-secondary/30 p-3 rounded-lg border border-border">
-              <div className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">{t.settings.alarm}</span>
-                <div className="flex gap-1">
-                  {[['beep', 'Beep'], ['siren', 'Sirena'], ['chime', 'Campana']].map(([val, lbl]) => (
-                    <div key={val} className="flex-1 flex gap-0.5">
-                      <button onClick={() => { setAlarmSoundType(val); saveSettings({ alarmSoundType: val }) }}
-                        className={`flex-1 text-xs py-1.5 rounded-l-md border transition-colors ${alarmSoundType === val ? 'bg-primary text-primary-foreground border-primary' : 'bg-secondary border-transparent hover:bg-secondary/80'}`}>
-                        {lbl}
-                      </button>
-                      <button onClick={() => playAlarmSound(val)}
-                        className="px-1.5 py-1.5 bg-secondary/70 hover:bg-secondary border border-transparent rounded-r-md transition-colors text-muted-foreground hover:text-foreground" title="Escuchar">
-                        <Play className="w-2.5 h-2.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">{t.settings.timer}</span>
-                <div className="flex gap-1">
-                  {[['beep', 'Beep'], ['siren', 'Sirena'], ['chime', 'Campana']].map(([val, lbl]) => (
-                    <div key={val} className="flex-1 flex gap-0.5">
-                      <button onClick={() => { setTimerSoundType(val); saveSettings({ timerSoundType: val }) }}
-                        className={`flex-1 text-xs py-1.5 rounded-l-md border transition-colors ${timerSoundType === val ? 'bg-primary text-primary-foreground border-primary' : 'bg-secondary border-transparent hover:bg-secondary/80'}`}>
-                        {lbl}
-                      </button>
-                      <button onClick={() => playAlarmSound(val)}
-                        className="px-1.5 py-1.5 bg-secondary/70 hover:bg-secondary border border-transparent rounded-r-md transition-colors text-muted-foreground hover:text-foreground" title="Escuchar">
-                        <Play className="w-2.5 h-2.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <Settings2 className="w-3 h-3" /> {t.settings.widgetSettings}
-            </div>
-            <div className="flex flex-col gap-3 bg-secondary/30 p-3 rounded-lg border border-border">
-              <div className="flex items-center justify-between">
-                <span className="text-xs">{t.settings.secondsCentralClock}</span>
-                <Switch checked={showSeconds} onCheckedChange={(v) => { setShowSeconds(v); saveSettings({ showSeconds: v }) }} />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs">{t.settings.secondsWidgetClock}</span>
-                <Switch checked={widgetShowSeconds} onCheckedChange={(v) => { setWidgetShowSeconds(v); saveSettings({ widgetShowSeconds: v }) }} />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs">{t.settings.showLocation}</span>
-                <Switch checked={weatherShowLocation} onCheckedChange={(v) => { setWeatherShowLocation(v); saveSettings({ weatherShowLocation: v }) }} />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs">{t.settings.showDetails}</span>
-                <Switch checked={weatherShowStats} onCheckedChange={(v) => { setWeatherShowStats(v); saveSettings({ weatherShowStats: v }) }} />
-              </div>
-            </div>
-          </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <Plus className="w-4 h-4" /> {t.settings.addWidget}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {availableWidgets.length > 0 ? availableWidgets.map(widgetId => (
-                    <button
-                      key={widgetId}
-                      onClick={() => handleAddWidget(widgetId)}
-                      className="text-xs px-3 py-1.5 rounded-full border border-primary/30 bg-primary/10 hover:bg-primary hover:text-primary-foreground transition-colors capitalize flex items-center gap-1"
-                    >
-                      <Plus className="w-3 h-3" /> {t.widgets[widgetId] || widgetId.replace('-', ' ')}
-                    </button>
-                  )) : (
-                    <span className="text-xs text-muted-foreground italic">{t.settings.allWidgetsUsed}</span>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-2 pt-4 border-t border-border">
-                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                  <Settings2 className="w-3 h-3" /> {t.settings.data}
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleExportData}
-                    className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/80 py-2 rounded-md flex items-center justify-center gap-2 transition-colors text-xs font-medium"
-                  >
-                    <Download className="w-3 h-3" /> {t.settings.export}
-                  </button>
-                  <label className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/80 py-2 rounded-md flex items-center justify-center gap-2 transition-colors text-xs font-medium cursor-pointer mb-0">
-                    <Upload className="w-3 h-3" /> {t.settings.import}
-                    <input type="file" accept=".json" className="hidden" onChange={handleImportData} />
-                  </label>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        </DrawerContent>
-      </Drawer>
+      <SettingsDrawer
+        open={isDrawerOpen}
+        onOpenChange={setIsDrawerOpen}
+        backgroundType={backgroundType} setBackgroundType={setBackgroundType}
+        customBgColor={customBgColor} setCustomBgColor={setCustomBgColor}
+        particleColor={particleColor} setParticleColor={setParticleColor}
+        particleBgColor={particleBgColor} setParticleBgColor={setParticleBgColor}
+        centralClockType={centralClockType} setCentralClockType={setCentralClockType}
+        widgetClockStyle={widgetClockStyle} setWidgetClockStyle={setWidgetClockStyle}
+        showSeconds={showSeconds} setShowSeconds={setShowSeconds}
+        widgetShowSeconds={widgetShowSeconds} setWidgetShowSeconds={setWidgetShowSeconds}
+        weatherShowLocation={weatherShowLocation} setWeatherShowLocation={setWeatherShowLocation}
+        weatherShowStats={weatherShowStats} setWeatherShowStats={setWeatherShowStats}
+        chimeEnabled={chimeEnabled} setChimeEnabled={setChimeEnabled}
+        chimeSoundType={chimeSoundType} setChimeSoundType={setChimeSoundType}
+        chimeSilentFrom={chimeSilentFrom} setChimeSilentFrom={setChimeSilentFrom}
+        chimeSilentTo={chimeSilentTo} setChimeSilentTo={setChimeSilentTo}
+        alarmSoundType={alarmSoundType} setAlarmSoundType={setAlarmSoundType}
+        timerSoundType={timerSoundType} setTimerSoundType={setTimerSoundType}
+        layout={layout} setLayout={setLayout}
+        setIsCustomizationMode={setIsCustomizationMode}
+        applyTheme={applyTheme}
+        handleAddWidget={handleAddWidget}
+      />
 
       <div className={`w-full relative z-10 h-full flex transition-transform duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] ${isCustomizationMode ? "scale-95" : ""}`}>
         {/* === MODO NORMAL === */}
-        <div className={`absolute inset-0 w-full h-full flex flex-col items-center justify-center transition-all duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] ${isFocusMode ? "translate-y-full opacity-0 pointer-events-none" : "translate-y-0 opacity-100"}`}>
+        <div className={`absolute inset-0 w-full h-full flex flex-col items-center justify-center transition-all duration-700 ease-out ${isFocusMode ? "opacity-0 scale-[0.97] pointer-events-none" : "opacity-100 scale-100"}`}>
           {/* Main Content Area */}
           <DndContext
             sensors={sensors}
@@ -1105,39 +672,41 @@ export default function HomePage() {
           </DndContext>
         </div>
 
-        {/* === MODO FOCUS === */}
-        <div className={`absolute inset-0 w-full h-full flex flex-col items-center justify-center bg-background/50 backdrop-blur-md transition-all duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] ${isFocusMode ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0 pointer-events-none"}`}>
-          <div className="w-full max-w-5xl flex flex-col min-h-[80vh] items-center">
-            <div className="w-full flex items-center justify-between mb-10 px-8">
-              <button onClick={() => setIsFocusMode(false)} className="px-5 py-2.5 border border-border bg-card/80 backdrop-blur-md rounded-full text-muted-foreground hover:text-foreground hover:bg-card transition-colors flex items-center gap-2 shadow-sm">
-                <ArrowLeft className="w-4 h-4" /> {t.focus.exit}
-              </button>
+        {/* === ZEN FOCUS MODE === */}
+        <div className={`absolute inset-0 w-full h-full flex flex-col items-center justify-center transition-opacity duration-500 ease-out ${isFocusMode ? "opacity-100 animate-slide-up" : "opacity-0 pointer-events-none"}`}>
+          {/* Header — always slightly visible (opacity-20) to give a hint */}
+          <div className={`absolute top-8 left-0 right-0 flex items-center justify-between px-8 transition-all duration-500 z-10 ${showUI ? "opacity-100" : "opacity-20"}`}>
+            <span className="text-sm font-mono text-muted-foreground/40">{hours}:{minutes}</span>
+            <button
+              onClick={() => setIsFocusMode(false)}
+              className="text-xs text-muted-foreground/40 hover:text-foreground transition-colors"
+            >
+              {t.focus.exit}
+            </button>
+          </div>
 
-              <div className="text-3xl font-mono font-bold text-foreground">
-                {hours}:{minutes}
-              </div>
+          {/* Center: timer only — no cards, no chrome */}
+          <div className="flex flex-col items-center justify-center">
+            <PomodoroTimer onPomodoroComplete={handlePomodoroComplete} onPomodoroActive={handlePomodoroActive} isFocusMode={true} showControls={showUI} />
+          </div>
 
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
-                <div className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                  {t.focus.active}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col lg:flex-row items-center justify-center gap-8 w-full px-8 pb-10 max-w-6xl mx-auto">
-              <div className="w-full max-w-2xl bg-card/30 backdrop-blur-sm p-8 rounded-3xl border border-border/50 shadow-xl">
-                <PomodoroTimer onPomodoroComplete={handlePomodoroComplete} onPomodoroActive={handlePomodoroActive} isFocusMode={true} />
-              </div>
-              <div className="flex flex-col gap-6 w-full max-w-xs xl:max-w-sm">
-                <div className={`${cardClass} rounded-3xl p-6 shadow-xl w-full`}>
-                  <MonthCalendar currentDate={currentTime} pomodoroRefresh={pomodoroRefresh} isFocusMode={true} />
-                </div>
-                <div className={`${cardClass} rounded-3xl p-6 shadow-xl w-full`}>
-                  <AmbientSounds ref={ambientRef} />
-                </div>
-              </div>
-            </div>
+          {/* Ambient toggle — visible on mouse move */}
+          <div className={`absolute bottom-8 transition-all duration-500 z-10 ${showUI ? "opacity-100" : "opacity-0"}`}>
+            <button
+              onClick={() => {
+                if (isAmbientActive) {
+                  ambientRef.current?.autoPause()
+                  setIsAmbientActive(false)
+                } else {
+                  ambientRef.current?.autoPlay()
+                  setIsAmbientActive(true)
+                }
+              }}
+              className="flex items-center gap-2 px-3 py-2 text-muted-foreground/30 hover:text-foreground transition-colors"
+            >
+              {isAmbientActive ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              <span className="text-xs">{t.ambient.title}</span>
+            </button>
           </div>
         </div>
       </div>

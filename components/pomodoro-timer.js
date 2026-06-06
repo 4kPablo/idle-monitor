@@ -8,6 +8,7 @@ import {
 } from "lucide-react"
 import { savePomodoroLog } from "@/lib/pomodoro-store"
 import { useLanguage } from "@/lib/language-context"
+import { useTimerStore } from "@/lib/timer-store"
 
 // Available icons for activity customization
 const ICON_OPTIONS = [
@@ -130,7 +131,7 @@ function ActivityEditor({ draft, setDraft, onSave, onCancel }) {
   )
 }
 
-export default function PomodoroTimer({ onPomodoroComplete, onPomodoroActive, isFocusMode }) {
+export default function PomodoroTimer({ onPomodoroComplete, onPomodoroActive, isFocusMode, showControls = true }) {
   const { t } = useLanguage()
   const [activities, setActivities] = useState(loadActivities)
   const [selectedActivity, setSelectedActivity] = useState(null)
@@ -207,8 +208,36 @@ export default function PomodoroTimer({ onPomodoroComplete, onPomodoroActive, is
         if (!isBreak) setElapsedTime(p => p + 1)
       }, 1000)
     }
-    return () => clearInterval(intervalRef.current)
+    return () => {
+      clearInterval(intervalRef.current)
+    }
   }, [isActive, isBreak, mode])
+
+  // Push timer state to global store so the indicator bar can show it
+  useEffect(() => {
+    if (isActive) {
+      useTimerStore.getState().update({
+        type: mode === 'pomodoro' ? 'pomodoro' : mode,
+        status: 'running',
+        timeLeft: mode === 'pomodoro' ? pomodoroTimeLeft : mode === 'timer' ? timerLeft : stopwatchTime,
+        display: displayTime,
+        isBreak,
+        activity: currentActivity?.label || null,
+      })
+    }
+  }, [pomodoroTimeLeft, timerLeft, stopwatchTime, isActive, mode, isBreak, currentActivity])
+
+  // Sync pause/idle state
+  useEffect(() => {
+    if (!isActive) {
+      const hasTimerBeenUsed = elapsedTime > 0 || pomodoroTimeLeft < 25 * 60 || timerLeft < 15 * 60 || stopwatchTime > 0
+      if (hasTimerBeenUsed) {
+        useTimerStore.getState().update({ status: 'paused' })
+      } else {
+        useTimerStore.getState().clear()
+      }
+    }
+  }, [isActive])
 
   useEffect(() => {
     if (mode === "pomodoro" && isActive && pomodoroTimeLeft === 0) {
@@ -241,6 +270,7 @@ export default function PomodoroTimer({ onPomodoroComplete, onPomodoroActive, is
       savePomodoroLog(selectedActivity, Math.round(elapsedTime / 60))
       if (onPomodoroComplete) onPomodoroComplete()
     }
+    useTimerStore.getState().clear()
     setIsActive(false); setIsBreak(false); setElapsedTime(0); startTimeRef.current = null
     if (nextMode === "pomodoro") setPomodoroTimeLeft(WORK_TIME)
     else if (nextMode === "timer") setTimerLeft(customTimerLength)
@@ -306,10 +336,12 @@ export default function PomodoroTimer({ onPomodoroComplete, onPomodoroActive, is
     return act.label
   }
 
+  const hideUI = isFocusMode && !showControls
+
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4 ${hideUI ? "group/timer" : ""}`}>
       {/* Activity bar */}
-      <div className="space-y-2">
+      <div className={`space-y-2 transition-opacity duration-500 ${hideUI ? "opacity-0 group-hover/timer:opacity-100" : ""}`}>
         <div className="flex gap-2 flex-wrap items-center">
           {activities.map((activity) => {
             const Icon = getIconComponent(activity.iconId)
@@ -411,7 +443,7 @@ export default function PomodoroTimer({ onPomodoroComplete, onPomodoroActive, is
           )}
         </div>
 
-        <div className="flex items-center justify-center gap-4">
+        <div className={`flex items-center justify-center gap-4 transition-all duration-500 ${hideUI ? "opacity-0 group-hover/timer:opacity-100" : ""}`}>
           <Button variant="outline" size="icon" className="h-12 w-12 rounded-full shadow-sm hover:scale-110 transition-transform bg-background" onClick={() => setIsActive(!isActive)}>
             {isActive ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-1" />}
           </Button>
