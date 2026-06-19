@@ -21,7 +21,7 @@ const TaskList = () => {
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission()
     }
-    const saved = localStorage.getItem("comfy-tasks")
+    const saved = localStorage.getItem("idle-tasks")
     if (saved) {
       const parsed = JSON.parse(saved)
       setTasks(parsed)
@@ -51,7 +51,7 @@ const TaskList = () => {
 
   const saveTasks = (newTasks) => {
     setTasks(newTasks)
-    localStorage.setItem("comfy-tasks", JSON.stringify(newTasks))
+    localStorage.setItem("idle-tasks", JSON.stringify(newTasks))
     setupReminders(newTasks)
   }
 

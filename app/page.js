@@ -267,7 +267,7 @@ export default function HomePage() {
   const setVideoId = useCallback((id) => {
     setVideoIdState(id)
     if (typeof window !== "undefined") {
-      localStorage.setItem("comfy-homescreen-youtube", id)
+      localStorage.setItem("idle-youtube", id)
     }
   }, [])
 
@@ -290,7 +290,7 @@ export default function HomePage() {
     }
     setLayout(savedLayout)
 
-    const savedVideo = localStorage.getItem("comfy-homescreen-youtube")
+    const savedVideo = localStorage.getItem("idle-youtube")
     if (savedVideo) {
       setVideoIdState(savedVideo)
     }

@@ -18,7 +18,7 @@ const QuickLinks = () => {
   const [newLink, setNewLink] = useState({ title: "", url: "" })
 
   useEffect(() => {
-    const saved = localStorage.getItem("comfy-quick-links")
+    const saved = localStorage.getItem("idle-quick-links")
     if (saved) {
       setLinks(JSON.parse(saved))
     } else {
@@ -28,7 +28,7 @@ const QuickLinks = () => {
 
   const saveLinks = (newLinks) => {
     setLinks(newLinks)
-    localStorage.setItem("comfy-quick-links", JSON.stringify(newLinks))
+    localStorage.setItem("idle-quick-links", JSON.stringify(newLinks))
   }
 
   const addLink = () => {

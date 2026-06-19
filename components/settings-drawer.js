@@ -130,17 +130,17 @@ export default function SettingsDrawer({
 
   const handleExportData = () => {
     const data = {
-      settings: localStorage.getItem("comfy-homescreen-settings"),
-      layout: localStorage.getItem("comfy-homescreen-widget-layout"),
-      pomodoro: localStorage.getItem('homescreen_pomodoros'),
+      settings: localStorage.getItem("idle-settings"),
+      layout: localStorage.getItem("idle-widget-layout"),
+      pomodoro: localStorage.getItem('idle-pomodoros'),
       pomodoroActivityModes: localStorage.getItem('pomodoroActivityModes'),
       pomodoroActivities: localStorage.getItem('pomodoroActivities'),
-      youtube: localStorage.getItem('comfy-homescreen-youtube')
+      youtube: localStorage.getItem('idle-youtube')
     }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
-    a.href = url; a.download = "comfy-homescreen-backup.json"
+    a.href = url; a.download = "idle-backup.json"
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
     URL.revokeObjectURL(url)
   }
@@ -152,12 +152,12 @@ export default function SettingsDrawer({
     reader.onload = (event) => {
       try {
         const data = JSON.parse(event.target.result)
-        if (data.settings) localStorage.setItem("comfy-homescreen-settings", data.settings)
-        if (data.layout) localStorage.setItem("comfy-homescreen-widget-layout", data.layout)
-        if (data.pomodoro) localStorage.setItem("homescreen_pomodoros", data.pomodoro)
+        if (data.settings) localStorage.setItem("idle-settings", data.settings)
+        if (data.layout) localStorage.setItem("idle-widget-layout", data.layout)
+        if (data.pomodoro) localStorage.setItem("idle-pomodoros", data.pomodoro)
         if (data.pomodoroActivityModes) localStorage.setItem("pomodoroActivityModes", data.pomodoroActivityModes)
         if (data.pomodoroActivities) localStorage.setItem("pomodoroActivities", data.pomodoroActivities)
-        if (data.youtube) localStorage.setItem("comfy-homescreen-youtube", data.youtube)
+        if (data.youtube) localStorage.setItem("idle-youtube", data.youtube)
         toast.success(t.toast?.importSuccess || "Datos importados")
         setTimeout(() => window.location.reload(), 1500)
       } catch { toast.error(t.toast?.importError || "Error al importar") }

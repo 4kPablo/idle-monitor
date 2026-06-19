@@ -79,13 +79,13 @@ const YoutubeWidget = ({ videoId, setVideoId, isVideoBackground, setIsVideoBackg
     const [newTitle, setNewTitle] = useState("")
 
     useEffect(() => {
-        const saved = localStorage.getItem('comfy-youtube-playlist')
+        const saved = localStorage.getItem('idle-youtube-playlist')
         if (saved) setSavedVideos(JSON.parse(saved))
     }, [])
 
     const savePlaylist = (list) => {
         setSavedVideos(list)
-        localStorage.setItem('comfy-youtube-playlist', JSON.stringify(list))
+        localStorage.setItem('idle-youtube-playlist', JSON.stringify(list))
     }
 
     const sensors = useSensors(
@@ -100,7 +100,7 @@ const YoutubeWidget = ({ videoId, setVideoId, isVideoBackground, setIsVideoBackg
                 const oldIndex = items.findIndex(i => i.id === active.id);
                 const newIndex = items.findIndex(i => i.id === over.id);
                 const reordered = arrayMove(items, oldIndex, newIndex);
-                localStorage.setItem('comfy-youtube-playlist', JSON.stringify(reordered));
+                localStorage.setItem('idle-youtube-playlist', JSON.stringify(reordered));
                 return reordered;
             });
         }
@@ -162,7 +162,7 @@ const YoutubeWidget = ({ videoId, setVideoId, isVideoBackground, setIsVideoBackg
                     const newVideo = { id: crypto.randomUUID(), url, videoId: id, title, author, createdAt: Date.now() }
                     setSavedVideos(prev => {
                         const newList = [...prev, newVideo]
-                        localStorage.setItem('comfy-youtube-playlist', JSON.stringify(newList))
+                        localStorage.setItem('idle-youtube-playlist', JSON.stringify(newList))
                         return newList
                     })
                     setUrl("")
@@ -173,7 +173,7 @@ const YoutubeWidget = ({ videoId, setVideoId, isVideoBackground, setIsVideoBackg
                     const newVideo = { id: crypto.randomUUID(), url, videoId: id, title, createdAt: Date.now() }
                     setSavedVideos(prev => {
                         const newList = [...prev, newVideo]
-                        localStorage.setItem('comfy-youtube-playlist', JSON.stringify(newList))
+                        localStorage.setItem('idle-youtube-playlist', JSON.stringify(newList))
                         return newList
                     })
                     setUrl("")
@@ -211,7 +211,7 @@ const YoutubeWidget = ({ videoId, setVideoId, isVideoBackground, setIsVideoBackg
                     setSavedVideos(prev => {
                         const restored = [...prev]
                         restored.splice(index, 0, video)
-                        localStorage.setItem('comfy-youtube-playlist', JSON.stringify(restored))
+                        localStorage.setItem('idle-youtube-playlist', JSON.stringify(restored))
                         return restored
                     })
                 }

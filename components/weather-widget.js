@@ -29,7 +29,7 @@ const WeatherWidget = ({ showLocation = true, showStats = true }) => {
       if (!res.ok) throw new Error(lang === 'es' ? "No se pudo obtener el clima" : "Could not retrieve weather data")
       const data = await res.json()
       setWeatherData(data)
-      if (data.name) localStorage.setItem("comfy-homescreen-weather-loc", data.name)
+      if (data.name) localStorage.setItem("idle-weather-loc", data.name)
       if (data.coord) setCoords(data.coord)
 
       // Fetch hourly forecast
@@ -48,7 +48,7 @@ const WeatherWidget = ({ showLocation = true, showStats = true }) => {
   }, [lang])
 
   const loadWeatherByLocation = useCallback(() => {
-    const savedLoc = localStorage.getItem("comfy-homescreen-weather-loc")
+    const savedLoc = localStorage.getItem("idle-weather-loc")
     if (navigator.geolocation && !savedLoc) {
       navigator.geolocation.getCurrentPosition(
         (position) => {

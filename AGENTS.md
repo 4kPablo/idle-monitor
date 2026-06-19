@@ -1,11 +1,12 @@
-# Comfy Homescreen — AGENTS.md
+# Idle Screen — AGENTS.md
 
 ## Quick start
 ```bash
-pnpm dev        # dev server
-pnpm build      # production build
-pnpm lint       # ESLint
-pnpm start      # start production server
+pnpm dev          # dev server
+pnpm build        # static export → out/
+pnpm lint         # ESLint
+pnpm preview      # wrangler pages dev out/ (local Cloudflare Preview)
+pnpm deploy       # wrangler pages deploy out/ --branch main
 ```
 
 No test suite exists. No CI/CD. No type checker step (`tsc` is not a script, and `typescript.ignoreBuildErrors: true` in next.config.mjs — do not fix type errors unless asked).
@@ -23,7 +24,8 @@ No test suite exists. No CI/CD. No type checker step (`tsc` is not a script, and
 app/                          # Next.js App Router entrypoint
   layout.js                   # Root layout — wraps in LanguageProvider + ThemeProvider (imports styles/globals.css)
   page.js                     # Main SPA (~715 lines, "use client") — state, widget rendering, focus mode
-  api/ai-news/route.js        # GET route — proxies Gemini 2.0 Flash with Google Search
+functions/
+  api/ai-news.js              # Cloudflare Pages Function — proxies Gemini 2.0 Flash with Google Search
 components/
   *.js                        # Widget implementations (all "use client")
   settings-drawer.js          # Extracted settings panel (Drawer with language, themes, backgrounds, sounds, etc.)
@@ -55,8 +57,8 @@ public/
 - **All widgets are `"use client"`** — the page itself is a client component.
 - **Shadcn `components.json`**: style `new-york`, RSC enabled, `@/` maps to root.
 - **i18n**: `language-context.js` contains all translation strings for `es` (default) and `en`. Uses React Context. Language is persisted in localStorage settings.
-- **Settings & widget layout** persist entirely in `localStorage` (no backend DB). Keys: `comfy-homescreen-settings`, `comfy-homescreen-widget-layout`, `homescreen_pomodoros`.
-- **API keys** (in `.env.local`): `NEXT_PUBLIC_WEATHER_API_KEY` (client-safe, for openweathermap) and `GEMINI_API_KEY` (server-only, via Gemini). Both are committed — do not rotate unless asked.
+- **Settings & widget layout** persist entirely in `localStorage` (no backend DB). Keys: `idle-settings`, `idle-widget-layout`, `idle-pomodoros`.
+- **API keys**: `NEXT_PUBLIC_WEATHER_API_KEY` está en `.env.local` y en `wrangler.toml` (client-safe, para openweathermap). `GEMINI_API_KEY` se configura como **secret** en Cloudflare Dashboard (`wrangler pages secret put GEMINI_API_KEY`).
 - **Background themes** use CSS custom properties (`--primary`, `--accent`, `--ring`) set dynamically via JS. The `THEME_CONFIG` object in `lib/themes.js` maps background type to color presets. Each theme entry also includes `particleColor` and `particleBg` for the particles background — changing a theme sets everything at once (no separate particle color UI).
 - **Ruby-style text stroke/shadow** CSS classes in `styles/globals.css`: `.text-stroke-1`, `.text-shadow-sm`.
 
@@ -67,13 +69,12 @@ public/
 - **Tailwind v4** — no `tailwind.config`, no `@apply` directives except in `@layer base`. Use CSS `@import "tailwindcss"` and the `@theme inline` block for theme tokens.
 - **shadcn components** live in `components/ui/` and follow the standard shadcn pattern.
 
-## API routes
-- `/api/ai-news?lang=es|en` — GET, cached server-side with `unstable_cache`. Uses Gemini 2.0 Flash with `google_search` grounding. Cache revalidates every 24h, but time-window key changes force freshness.
-- Window calculation is fixed to UTC-3.
+## API
+- **`/api/ai-news?lang=es|en`** — Cloudflare Pages Function (`functions/api/ai-news.js`). Usa Cache API para 24h de caché. Ventanas de 6h fijas a UTC-3. No requiere Vercel ni adapters.
 
 ## Gotchas / pitfalls
 - TypeScript errors **will not fail the build** (`ignoreBuildErrors: true`). Do not attempt to fix TS issues unless explicitly told to.
 - The page is a 715-line client component. Any significant refactor should be discussed first.
-- `.env.local` is gitignored by pattern but the current file is tracked (it was committed before the gitignore rule). Avoid touching it unless necessary.
+- `.env.local` is gitignored by pattern but the current file is tracked (it was committed before the gitignore rule). Avoid touching it unless necessary. `GEMINI_API_KEY` se setea como secret de Cloudflare, no en `.env.local`.
 - The app uses `next-themes` for dark mode but the default theme is always `dark` and the CSS variables are overridden by JS theme logic on load.
 - `sonner` toasts are used in the page (not the legacy shadcn toast). See `app/page.js:28`.
