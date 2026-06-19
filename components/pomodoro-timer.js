@@ -339,9 +339,9 @@ export default function PomodoroTimer({ onPomodoroComplete, onPomodoroActive, is
   const hideUI = isFocusMode && !showControls
 
   return (
-    <div className={`space-y-4 ${hideUI ? "group/timer" : ""}`}>
+    <div className={hideUI ? "" : "space-y-4"}>
       {/* Activity bar */}
-      <div className={`space-y-2 transition-opacity duration-500 ${hideUI ? "opacity-0 group-hover/timer:opacity-100" : ""}`}>
+      <div className={`space-y-2 ${hideUI ? "hidden" : ""}`}>
         <div className="flex gap-2 flex-wrap items-center">
           {activities.map((activity) => {
             const Icon = getIconComponent(activity.iconId)
@@ -421,7 +421,7 @@ export default function PomodoroTimer({ onPomodoroComplete, onPomodoroActive, is
 
       {/* Timer display */}
       <div className="space-y-6 flex flex-col items-center">
-        <div className="flex flex-col items-center justify-center py-6">
+        <div className={`flex flex-col items-center justify-center ${hideUI ? "" : "py-6"}`}>
           <span
             className="text-[7rem] leading-none font-mono font-bold tracking-tighter tabular-nums drop-shadow-sm transition-colors duration-500"
             style={{ color: currentActivity?.color || "var(--foreground)" }}
@@ -443,7 +443,7 @@ export default function PomodoroTimer({ onPomodoroComplete, onPomodoroActive, is
           )}
         </div>
 
-        <div className={`flex items-center justify-center gap-4 transition-all duration-500 ${hideUI ? "opacity-0 group-hover/timer:opacity-100" : ""}`}>
+        <div className={`flex items-center justify-center gap-4 ${hideUI ? "hidden" : ""}`}>
           <Button variant="outline" size="icon" className="h-12 w-12 rounded-full shadow-sm hover:scale-110 transition-transform bg-background" onClick={() => setIsActive(!isActive)}>
             {isActive ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-1" />}
           </Button>

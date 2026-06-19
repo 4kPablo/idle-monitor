@@ -252,7 +252,7 @@ const AmbientSounds = forwardRef((props, ref) => {
       <div className="grid grid-cols-5 gap-1.5">
         {SOUNDS.map((sound) => {
           const Icon = sound.icon
-          const isActive = activeSound === sound.id
+          const isActive = activeSound === sound.id && isPlaying
           const label = t.ambient[sound.id] || sound.label
           const subtitle = t.ambient[sound.id + "Sub"] || sound.subtitle
           const binauralHint = sound.type === "binaural" ? (lang === 'es' ? "\n🎧 Mejor con auriculares" : "\n🎧 Better with headphones") : ""
