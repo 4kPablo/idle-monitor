@@ -1,4 +1,4 @@
-# Idle Screen — AGENTS.md
+# Idle Monitor — AGENTS.md
 
 ## Quick start
 ```bash

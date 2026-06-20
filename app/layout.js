@@ -3,7 +3,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { LanguageProvider } from "@/lib/language-context"
 
 export const metadata = {
-  title: "Idle Screen",
+  title: "Idle Monitor",
   description: "Tu pantalla secundaria perfecta",
   manifest: "/manifest.json",
   icons: {
@@ -11,7 +11,7 @@ export const metadata = {
     apple: "/icon.jpg",
   },
   openGraph: {
-    title: "Idle Screen",
+    title: "Idle Monitor",
     description: "Tu pantalla secundaria perfecta con reloj, calendario y widgets útiles",
     images: [
       {
@@ -24,14 +24,14 @@ export const metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Idle Screen",
+    title: "Idle Monitor",
     description: "Tu pantalla secundaria perfecta",
     images: ["/logo.jpg"],
   },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Idle Screen",
+    title: "Idle Monitor",
   },
   formatDetection: {
     telephone: false,
