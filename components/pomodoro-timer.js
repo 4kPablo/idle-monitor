@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import {
   BookOpen, Dumbbell, Pencil, Play, Pause, RotateCcw, Plus, Trash2,
@@ -8,7 +8,7 @@ import {
 } from "lucide-react"
 import { savePomodoroLog } from "@/lib/pomodoro-store"
 import { useLanguage } from "@/lib/language-context"
-import { useTimerStore } from "@/lib/timer-store"
+import { isCancellableTimer, useTimerStore } from "@/lib/timer-store"
 
 // Available icons for activity customization
 const ICON_OPTIONS = [
@@ -141,17 +141,13 @@ export default function PomodoroTimer({ onPomodoroComplete, onPomodoroActive, is
   const [isCreating, setIsCreating] = useState(false)
   const [newDraft, setNewDraft] = useState({ label: "", iconId: "BookOpen", color: COLOR_OPTIONS[0], mode: "pomodoro" })
 
-  // Timer state
-  const [isActive, setIsActive] = useState(false)
-  const [pomodoroTimeLeft, setPomodoroTimeLeft] = useState(25 * 60)
-  const [isBreak, setIsBreak] = useState(false)
+  const timer = useTimerStore()
   const [customTimerLength, setCustomTimerLength] = useState(15 * 60)
-  const [timerLeft, setTimerLeft] = useState(15 * 60)
-  const [stopwatchTime, setStopwatchTime] = useState(0)
-  const [elapsedTime, setElapsedTime] = useState(0)
-
-  const intervalRef = useRef(null)
-  const startTimeRef = useRef(null)
+  const isActive = timer.status === "running"
+  const isBreak = timer.isBreak
+  const pomodoroTimeLeft = timer.type === "pomodoro" ? timer.remaining : 25 * 60
+  const timerLeft = timer.type === "timer" ? timer.remaining : customTimerLength
+  const stopwatchTime = timer.type === "stopwatch" ? timer.elapsed : 0
 
   const WORK_TIME = 25 * 60
   const BREAK_TIME = 5 * 60
@@ -159,6 +155,12 @@ export default function PomodoroTimer({ onPomodoroComplete, onPomodoroActive, is
 
   const currentActivity = activities.find(a => a.id === selectedActivity)
   const mode = currentActivity?.mode || "pomodoro"
+
+  useEffect(() => {
+    if (timer.activityId && activities.some(activity => activity.id === timer.activityId)) {
+      setSelectedActivity(timer.activityId)
+    }
+  }, [activities, timer.activityId])
 
   const playNotificationSound = useCallback(() => {
     try {
@@ -182,106 +184,66 @@ export default function PomodoroTimer({ onPomodoroComplete, onPomodoroActive, is
 
   const showNotification = useCallback((title, body) => {
     if ("Notification" in window && Notification.permission === "granted") {
-      new Notification(title, { body, icon: "/icon-192.png", tag: "pomodoro" })
+      new Notification(title, { body, icon: "/android-chrome-192x192.png", tag: "pomodoro" })
     }
   }, [])
 
   useEffect(() => {
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission()
-    }
-  }, [])
-
-  useEffect(() => {
-    if (onPomodoroActive) {
-      onPomodoroActive(isActive && !isBreak)
-    }
+    if (onPomodoroActive) onPomodoroActive(isActive && !isBreak)
   }, [isActive, isBreak, onPomodoroActive])
 
   useEffect(() => {
-    if (isActive) {
-      if (!startTimeRef.current && !isBreak) startTimeRef.current = Date.now()
-      intervalRef.current = setInterval(() => {
-        if (mode === "pomodoro") setPomodoroTimeLeft(p => Math.max(0, p - 1))
-        else if (mode === "timer") setTimerLeft(p => Math.max(0, p - 1))
-        else if (mode === "stopwatch") setStopwatchTime(p => p + 1)
-        if (!isBreak) setElapsedTime(p => p + 1)
-      }, 1000)
-    }
-    return () => {
-      clearInterval(intervalRef.current)
-    }
-  }, [isActive, isBreak, mode])
-
-  // Push timer state to global store so the indicator bar can show it
-  useEffect(() => {
-    if (isActive) {
-      useTimerStore.getState().update({
-        type: mode === 'pomodoro' ? 'pomodoro' : mode,
-        status: 'running',
-        timeLeft: mode === 'pomodoro' ? pomodoroTimeLeft : mode === 'timer' ? timerLeft : stopwatchTime,
-        display: displayTime,
-        isBreak,
-        activity: currentActivity?.label || null,
-      })
-    }
-  }, [pomodoroTimeLeft, timerLeft, stopwatchTime, isActive, mode, isBreak, currentActivity])
-
-  // Sync pause/idle state
-  useEffect(() => {
-    if (!isActive) {
-      const hasTimerBeenUsed = elapsedTime > 0 || pomodoroTimeLeft < 25 * 60 || timerLeft < 15 * 60 || stopwatchTime > 0
-      if (hasTimerBeenUsed) {
-        useTimerStore.getState().update({ status: 'paused' })
-      } else {
-        useTimerStore.getState().clear()
-      }
-    }
-  }, [isActive])
+    const reconcile = () => useTimerStore.getState().reconcile()
+    reconcile()
+    const interval = setInterval(reconcile, 250)
+    document.addEventListener("visibilitychange", reconcile)
+    return () => { clearInterval(interval); document.removeEventListener("visibilitychange", reconcile) }
+  }, [])
 
   useEffect(() => {
-    if (mode === "pomodoro" && isActive && pomodoroTimeLeft === 0) {
-      playNotificationSound()
-      if (!isBreak) {
-        showNotification(t.pomodoro.pomodoroComplete, t.pomodoro.breakTime)
-        if (elapsedTime >= MIN_DURATION_TO_SAVE && selectedActivity) {
-          savePomodoroLog(selectedActivity, Math.round(elapsedTime / 60))
-          if (onPomodoroComplete) onPomodoroComplete()
-        }
-        setIsBreak(true); setPomodoroTimeLeft(BREAK_TIME)
-        setElapsedTime(0); startTimeRef.current = null
-      } else {
-        showNotification(t.pomodoro.breakDone, t.pomodoro.backToWork)
-        setIsBreak(false); setPomodoroTimeLeft(WORK_TIME); setIsActive(false)
-      }
-    } else if (mode === "timer" && isActive && timerLeft === 0) {
-      playNotificationSound()
-      showNotification(t.pomodoro.timerDone, t.pomodoro.timeUp)
-      if (elapsedTime >= MIN_DURATION_TO_SAVE && selectedActivity) {
-        savePomodoroLog(selectedActivity, Math.round(elapsedTime / 60))
-        if (onPomodoroComplete) onPomodoroComplete()
-      }
-      setIsActive(false); setElapsedTime(0); startTimeRef.current = null
-    }
-  }, [pomodoroTimeLeft, timerLeft, isActive, mode, isBreak, elapsedTime, selectedActivity, playNotificationSound, showNotification, t])
-
-  const resetTimer = (nextMode = mode) => {
-    if (elapsedTime >= MIN_DURATION_TO_SAVE && selectedActivity && !isBreak) {
-      savePomodoroLog(selectedActivity, Math.round(elapsedTime / 60))
+    const completed = timer.completion
+    if (!completed) return
+    playNotificationSound()
+    if (!completed.isBreak && completed.elapsed >= MIN_DURATION_TO_SAVE && completed.activityId) {
+      savePomodoroLog(completed.activityId, Math.round(completed.elapsed / 60), new Date(), "completed", completed.type)
       if (onPomodoroComplete) onPomodoroComplete()
     }
-    useTimerStore.getState().clear()
-    setIsActive(false); setIsBreak(false); setElapsedTime(0); startTimeRef.current = null
-    if (nextMode === "pomodoro") setPomodoroTimeLeft(WORK_TIME)
-    else if (nextMode === "timer") setTimerLeft(customTimerLength)
-    else if (nextMode === "stopwatch") setStopwatchTime(0)
+    if (completed.type === "pomodoro") {
+      showNotification(completed.isBreak ? t.pomodoro.breakDone : t.pomodoro.pomodoroComplete, completed.isBreak ? t.pomodoro.backToWork : t.pomodoro.breakTime)
+    } else {
+      showNotification(t.pomodoro.timerDone, t.pomodoro.timeUp)
+    }
+    timer.consumeCompletion()
+  }, [timer.completion, timer.consumeCompletion, onPomodoroComplete, playNotificationSound, showNotification, t])
+
+  const configureTimer = (nextMode = mode, activity = currentActivity) => {
+    const duration = nextMode === "pomodoro" ? WORK_TIME : nextMode === "timer" ? customTimerLength : 0
+    timer.configure({ type: nextMode, duration, activity: activity?.label || null, activityId: activity?.id || null })
+  }
+
+  const recordCancelledSession = () => {
+    useTimerStore.getState().reconcile()
+    const current = useTimerStore.getState()
+    if (isCancellableTimer(current, MIN_DURATION_TO_SAVE)) {
+      savePomodoroLog(current.activityId, Math.round(current.elapsed / 60), new Date(), "cancelled", current.type)
+      if (onPomodoroComplete) onPomodoroComplete()
+    }
+  }
+
+  const resetTimer = (nextMode = mode) => {
+    recordCancelledSession()
+    configureTimer(nextMode)
   }
 
   const handleActivitySelect = (id) => {
     if (isManaging) return
     const isSelected = selectedActivity === id
-    setSelectedActivity(isSelected ? null : id)
-    resetTimer(isSelected ? mode : (activities.find(a => a.id === id)?.mode || "pomodoro"))
+    const nextActivity = isSelected ? null : activities.find(a => a.id === id)
+    recordCancelledSession()
+    setSelectedActivity(nextActivity?.id || null)
+    const nextMode = nextActivity?.mode || mode
+    const duration = nextMode === "pomodoro" ? WORK_TIME : nextMode === "timer" ? customTimerLength : 0
+    timer.configure({ type: nextMode, duration, activity: nextActivity?.label || null, activityId: nextActivity?.id || null })
   }
 
   const updateActivity = (id, changes) => {
@@ -297,7 +259,11 @@ export default function PomodoroTimer({ onPomodoroComplete, onPomodoroActive, is
     const updated = activities.filter(a => a.id !== id)
     setActivities(updated)
     saveActivitiesStore(updated)
-    if (selectedActivity === id) setSelectedActivity(null)
+    if (selectedActivity === id) {
+      recordCancelledSession()
+      setSelectedActivity(null)
+      timer.clear()
+    }
   }
 
   const addActivity = () => {
@@ -434,7 +400,7 @@ export default function PomodoroTimer({ onPomodoroComplete, onPomodoroActive, is
                 <button
                   key={mins}
                   className="px-3 py-1 bg-secondary/50 rounded-full text-xs font-medium hover:bg-secondary transition-colors"
-                  onClick={() => { setCustomTimerLength(mins * 60); setTimerLeft(mins * 60) }}
+                  onClick={() => { setCustomTimerLength(mins * 60); timer.configure({ type: "timer", duration: mins * 60, activity: currentActivity?.label || null, activityId: currentActivity?.id || null }) }}
                 >
                   {lbl}
                 </button>
@@ -444,7 +410,7 @@ export default function PomodoroTimer({ onPomodoroComplete, onPomodoroActive, is
         </div>
 
         <div className={`flex items-center justify-center gap-4 ${hideUI ? "hidden" : ""}`}>
-          <Button variant="outline" size="icon" className="h-12 w-12 rounded-full shadow-sm hover:scale-110 transition-transform bg-background" onClick={() => setIsActive(!isActive)}>
+          <Button variant="outline" size="icon" className="h-12 w-12 rounded-full shadow-sm hover:scale-110 transition-transform bg-background" onClick={() => { if (!timer.type) configureTimer(); isActive ? timer.pause() : useTimerStore.getState().start() }}>
             {isActive ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-1" />}
           </Button>
           <Button variant="outline" size="icon" className="h-12 w-12 rounded-full shadow-sm hover:scale-110 transition-transform bg-background text-muted-foreground" onClick={() => resetTimer()}>
@@ -452,9 +418,7 @@ export default function PomodoroTimer({ onPomodoroComplete, onPomodoroActive, is
           </Button>
           {isBreak && mode === "pomodoro" && (
             <Button variant="outline" size="icon" className="h-12 w-12 rounded-full shadow-sm hover:scale-110 transition-transform bg-background text-muted-foreground" onClick={() => {
-              setIsBreak(false)
-              setPomodoroTimeLeft(WORK_TIME)
-              setIsActive(true)
+              timer.skipBreak()
             }} title={t.pomodoro.skipBreak}>
               <SkipForward className="w-5 h-5" />
             </Button>

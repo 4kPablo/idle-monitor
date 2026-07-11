@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { getPomodorosForMonth, getPomodorosForDay, savePomodoroLog, deletePomodoroLog } from "@/lib/pomodoro-store"
 import { BookOpen, Dumbbell, Pencil, X, Plus, Trash2 } from "lucide-react"
 import { useLanguage } from "@/lib/language-context"
+import { useWallClock } from "@/hooks/use-wall-clock"
 
 const activityIcons = {
   study: { icon: BookOpen, color: "oklch(0.70 0.15 250)", label: "Estudiar" },
@@ -12,7 +13,8 @@ const activityIcons = {
   draw: { icon: Pencil, color: "oklch(0.70 0.15 30)", label: "Dibujar" },
 }
 
-export default function MonthCalendar({ currentDate, pomodoroRefresh }) {
+export default function MonthCalendar({ pomodoroRefresh }) {
+  const currentDate = useWallClock(60_000)
   const { lang, t } = useLanguage()
   const [mounted, setMounted] = useState(false)
   const [displayDate, setDisplayDate] = useState(currentDate)

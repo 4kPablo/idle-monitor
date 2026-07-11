@@ -89,7 +89,7 @@ export async function onRequest(context) {
     }), {
       headers: {
         "Content-Type": "application/json",
-        "Cache-Control": "public, s-maxage=86400, max-age=86400"
+        "Cache-Control": "public, s-maxage=21600, max-age=300, stale-while-revalidate=3600"
       }
     })
 

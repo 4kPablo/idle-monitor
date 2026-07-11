@@ -1,15 +1,18 @@
 "use client"
 
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef, useCallback } from "react"
 import { Clock, AlarmClock, Timer, TimerReset, Play, Pause, RotateCcw, Check } from "lucide-react"
 import { toast } from "sonner"
 import AnalogClock from "./analog-clock"
 import { playAlarmSound } from "./hourly-chime"
 import TimePicker from "./shadcn-studio/date-picker/date-picker-09"
 import { useLanguage } from "@/lib/language-context"
+import { useWallClock } from "@/hooks/use-wall-clock"
+import { elapsedStopwatchSeconds, remainingTimerSeconds } from "@/lib/timekeeping"
 
-export default function DigitalClockWidget({ time, showSeconds = true, clockStyle = "digital", alarmSoundType = "beep", timerSoundType = "beep" }) {
+export default function DigitalClockWidget({ showSeconds = true, clockStyle = "digital", alarmSoundType = "beep", timerSoundType = "beep" }) {
     const { lang, t } = useLanguage()
+    const time = useWallClock()
     const [mode, setMode] = useState("clock") // clock, alarm, timer, stopwatch
 
     const [alarmTime, setAlarmTime] = useState("00:00")
@@ -17,16 +20,20 @@ export default function DigitalClockWidget({ time, showSeconds = true, clockStyl
 
     const [timerSeconds, setTimerSeconds] = useState(5 * 60)
     const [timerActive, setTimerActive] = useState(false)
+    const [timerDeadline, setTimerDeadline] = useState(null)
+    const timerRemainingMs = useRef(5 * 60 * 1000)
     const [inputMinutes, setInputMinutes] = useState(5)
     const [inputSeconds, setInputSeconds] = useState(0)
 
     const [stopwatchSeconds, setStopwatchSeconds] = useState(0)
     const [stopwatchActive, setStopwatchActive] = useState(false)
+    const [stopwatchStartedAt, setStopwatchStartedAt] = useState(null)
+    const stopwatchAccumulatedMs = useRef(0)
 
     const timerRef = useRef(null)
     const alarmIntervalRef = useRef(null)
 
-    const triggerAlarm = (soundType) => {
+    const triggerAlarm = useCallback((soundType) => {
         try {
             if (alarmIntervalRef.current) clearInterval(alarmIntervalRef.current)
             playAlarmSound(soundType)
@@ -48,7 +55,7 @@ export default function DigitalClockWidget({ time, showSeconds = true, clockStyl
                 }
             })
         } catch (e) { }
-    }
+    }, [mode, t])
 
     useEffect(() => {
         if (alarmActive && alarmTime) {
@@ -58,25 +65,58 @@ export default function DigitalClockWidget({ time, showSeconds = true, clockStyl
                 setAlarmActive(false)
             }
         }
-    }, [time, alarmActive, alarmTime, alarmSoundType])
+    }, [time, alarmActive, alarmTime, alarmSoundType, triggerAlarm])
 
     useEffect(() => {
-        if (timerActive) {
-            timerRef.current = setInterval(() => {
-                setTimerSeconds(prev => {
-                    if (prev <= 1) {
-                        triggerAlarm(timerSoundType)
-                        setTimerActive(false)
-                        return 0
-                    }
-                    return prev - 1
-                })
-            }, 1000)
-        } else if (stopwatchActive) {
-            timerRef.current = setInterval(() => setStopwatchSeconds(prev => prev + 1), 1000)
+        const reconcile = () => {
+            const now = Date.now()
+            if (timerActive && timerDeadline) {
+                const remaining = remainingTimerSeconds(timerDeadline, now)
+                setTimerSeconds(remaining)
+                if (remaining === 0) {
+                    timerRemainingMs.current = 0
+                    setTimerActive(false)
+                    setTimerDeadline(null)
+                    triggerAlarm(timerSoundType)
+                }
+            }
+            if (stopwatchActive && stopwatchStartedAt) {
+                setStopwatchSeconds(elapsedStopwatchSeconds(stopwatchAccumulatedMs.current, stopwatchStartedAt, now))
+            }
         }
-        return () => clearInterval(timerRef.current)
-    }, [timerActive, stopwatchActive, timerSoundType])
+        if (timerActive || stopwatchActive) timerRef.current = setInterval(reconcile, 250)
+        document.addEventListener("visibilitychange", reconcile)
+        reconcile()
+        return () => {
+            clearInterval(timerRef.current)
+            document.removeEventListener("visibilitychange", reconcile)
+        }
+    }, [timerActive, timerDeadline, stopwatchActive, stopwatchStartedAt, timerSoundType, triggerAlarm])
+
+    const toggleTimer = () => {
+        if (timerActive) {
+            timerRemainingMs.current = Math.max(0, timerDeadline - Date.now())
+            setTimerSeconds(remainingTimerSeconds(timerDeadline, Date.now()))
+            setTimerDeadline(null)
+            setTimerActive(false)
+        } else if (timerSeconds > 0) {
+            setTimerDeadline(Date.now() + timerRemainingMs.current)
+            setTimerActive(true)
+        }
+    }
+
+    const toggleStopwatch = () => {
+        const now = Date.now()
+        if (stopwatchActive) {
+            stopwatchAccumulatedMs.current += Math.max(0, now - stopwatchStartedAt)
+            setStopwatchSeconds(elapsedStopwatchSeconds(stopwatchAccumulatedMs.current, null, now))
+            setStopwatchStartedAt(null)
+            setStopwatchActive(false)
+        } else {
+            setStopwatchStartedAt(now)
+            setStopwatchActive(true)
+        }
+    }
 
     const hours = time.getHours().toString().padStart(2, "0")
     const minutes = time.getMinutes().toString().padStart(2, "0")
@@ -89,7 +129,9 @@ export default function DigitalClockWidget({ time, showSeconds = true, clockStyl
     }
 
     const updateTimerFromInputs = (mins, secs) => {
-        setTimerSeconds((parseInt(mins || 0) * 60) + parseInt(secs || 0))
+        const duration = (parseInt(mins || 0) * 60) + parseInt(secs || 0)
+        timerRemainingMs.current = duration * 1000
+        setTimerSeconds(duration)
     }
 
     // Timer value as HH:MM:SS duration string
@@ -162,7 +204,15 @@ export default function DigitalClockWidget({ time, showSeconds = true, clockStyl
                                 label=""
                             />
                              <button
-                                onClick={() => { updateTimerFromInputs(inputMinutes, inputSeconds); if (inputMinutes || inputSeconds) setTimerActive(true) }}
+                                onClick={() => {
+                                    const duration = (Number(inputMinutes) * 60) + Number(inputSeconds || 0)
+                                    timerRemainingMs.current = duration * 1000
+                                    setTimerSeconds(duration)
+                                    if (duration > 0) {
+                                        setTimerDeadline(Date.now() + duration * 1000)
+                                        setTimerActive(true)
+                                    }
+                                }}
                                 className="p-2 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 flex-shrink-0"
                                 title={t.clock.start}
                             >
@@ -173,10 +223,10 @@ export default function DigitalClockWidget({ time, showSeconds = true, clockStyl
                         <>
                             <div className="font-mono text-3xl font-bold tracking-tight text-primary">{formatSecs(timerSeconds)}</div>
                             <div className="flex gap-2">
-                                <button onClick={() => setTimerActive(!timerActive)} className="p-2 bg-primary/10 text-primary rounded-full hover:bg-primary/20" title={timerActive ? t.clock.stop : t.clock.start}>
+                                <button onClick={toggleTimer} className="p-2 bg-primary/10 text-primary rounded-full hover:bg-primary/20" title={timerActive ? t.clock.stop : t.clock.start}>
                                     {timerActive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
                                 </button>
-                                <button onClick={() => { setTimerActive(false); updateTimerFromInputs(inputMinutes, inputSeconds) }} className="p-2 bg-secondary text-muted-foreground rounded-full hover:bg-secondary/80" title={t.clock.reset}>
+                                <button onClick={() => { setTimerActive(false); setTimerDeadline(null); updateTimerFromInputs(inputMinutes, inputSeconds) }} className="p-2 bg-secondary text-muted-foreground rounded-full hover:bg-secondary/80" title={t.clock.reset}>
                                     <RotateCcw className="w-4 h-4" />
                                 </button>
                             </div>
@@ -189,10 +239,10 @@ export default function DigitalClockWidget({ time, showSeconds = true, clockStyl
                 <div className="flex flex-col items-center gap-2 w-full px-4">
                     <div className="font-mono text-3xl font-bold tracking-tight text-primary">{formatSecs(stopwatchSeconds)}</div>
                     <div className="flex gap-2">
-                        <button onClick={() => setStopwatchActive(!stopwatchActive)} className="p-2 bg-primary/10 text-primary rounded-full hover:bg-primary/20" title={stopwatchActive ? t.clock.stop : t.clock.start}>
+                        <button onClick={toggleStopwatch} className="p-2 bg-primary/10 text-primary rounded-full hover:bg-primary/20" title={stopwatchActive ? t.clock.stop : t.clock.start}>
                             {stopwatchActive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
                         </button>
-                        <button onClick={() => { setStopwatchActive(false); setStopwatchSeconds(0) }} className="p-2 bg-secondary text-muted-foreground rounded-full hover:bg-secondary/80" title={t.clock.reset}>
+                        <button onClick={() => { setStopwatchActive(false); setStopwatchStartedAt(null); stopwatchAccumulatedMs.current = 0; setStopwatchSeconds(0) }} className="p-2 bg-secondary text-muted-foreground rounded-full hover:bg-secondary/80" title={t.clock.reset}>
                             <RotateCcw className="w-4 h-4" />
                         </button>
                     </div>

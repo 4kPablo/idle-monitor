@@ -13,6 +13,8 @@ export default function SpaceBg() {
     let stars = []
     const numStars = 400
     let animationFrameId
+    let running = true
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
 
     // Configuración
     const speed = 2 // Velocidad base
@@ -36,6 +38,7 @@ export default function SpaceBg() {
     }
 
     const draw = () => {
+      if (!running) return
       // Fondo negro con un ligero rastro para suavizar movimiento (opcional, aqui usamos limpiar)
       ctx.fillStyle = "black"
       ctx.fillRect(0, 0, canvas.width, canvas.height)
@@ -71,21 +74,30 @@ export default function SpaceBg() {
         }
       })
 
-      animationFrameId = requestAnimationFrame(draw)
+      if (!reducedMotion) animationFrameId = requestAnimationFrame(draw)
     }
 
     resize()
     initStars()
     draw()
 
-    window.addEventListener("resize", () => {
+    const handleResize = () => {
       resize()
       initStars()
-    })
+    }
+    const handleVisibility = () => {
+      running = !document.hidden
+      if (running && !reducedMotion) draw()
+      else cancelAnimationFrame(animationFrameId)
+    }
+    window.addEventListener("resize", handleResize)
+    document.addEventListener("visibilitychange", handleVisibility)
 
     return () => {
       cancelAnimationFrame(animationFrameId)
-      window.removeEventListener("resize", resize)
+      running = false
+      window.removeEventListener("resize", handleResize)
+      document.removeEventListener("visibilitychange", handleVisibility)
     }
   }, [])
 

@@ -6,8 +6,46 @@ import {
   CloudLightning, CloudSnow, CloudFog, MapPin, Search, RefreshCw, ChevronRight, ChevronLeft
 } from "lucide-react"
 import { useLanguage } from "@/lib/language-context"
+import { createRequestGenerationGuard } from "@/lib/weather-request"
 
-const API_KEY = process.env.NEXT_PUBLIC_WEATHER_API_KEY
+const OPENWEATHER_API_KEY = process.env.NEXT_PUBLIC_WEATHER_API_KEY
+
+async function readJsonResponse(response) {
+  const text = await response.text()
+  const contentType = response.headers.get("content-type") || ""
+
+  if (!contentType.includes("application/json")) {
+    throw new Error("non-json-response")
+  }
+
+  return text ? JSON.parse(text) : {}
+}
+
+async function fetchOpenWeatherPayload(params, lang, signal) {
+  if (!OPENWEATHER_API_KEY) {
+    throw new Error("weather-key-missing")
+  }
+
+  const currentParams = new URLSearchParams({ appid: OPENWEATHER_API_KEY, units: "metric", lang, ...params })
+  const currentResponse = await fetch(`https://api.openweathermap.org/data/2.5/weather?${currentParams}`, { signal })
+  if (!currentResponse.ok) {
+    throw new Error("weather-provider-error")
+  }
+
+  const current = await currentResponse.json()
+  const forecastParams = new URLSearchParams({
+    lat: String(current.coord.lat),
+    lon: String(current.coord.lon),
+    appid: OPENWEATHER_API_KEY,
+    units: "metric",
+    lang,
+    cnt: "8",
+  })
+  const forecastResponse = await fetch(`https://api.openweathermap.org/data/2.5/forecast?${forecastParams}`, { signal })
+  const forecast = forecastResponse.ok ? await forecastResponse.json() : { list: [] }
+
+  return { current, hourly: forecast.list || [] }
+}
 
 const WeatherWidget = ({ showLocation = true, showStats = true }) => {
   const { lang, t } = useLanguage()
@@ -20,61 +58,98 @@ const WeatherWidget = ({ showLocation = true, showStats = true }) => {
   const [searchQuery, setSearchQuery] = useState("")
   const [showHourly, setShowHourly] = useState(false)
   const [coords, setCoords] = useState(null)
+  const requestRef = React.useRef(null)
+  const mountedRef = React.useRef(true)
+  const generationGuard = React.useRef(createRequestGenerationGuard())
 
-  const fetchWeather = useCallback(async (url, forecastUrl) => {
+  const fetchWeather = useCallback(async (params, generation) => {
+    if (!mountedRef.current || !generationGuard.current.isCurrent(generation)) return
+    requestRef.current?.abort()
+    const controller = new AbortController()
+    requestRef.current = controller
     try {
       setLoading(true)
       setError(null)
-      const res = await fetch(url)
-      if (!res.ok) throw new Error(lang === 'es' ? "No se pudo obtener el clima" : "Could not retrieve weather data")
-      const data = await res.json()
+      const query = new URLSearchParams({ ...params, lang })
+      const res = await fetch(`/api/weather?${query}`, { signal: controller.signal })
+      let payload
+      try {
+        payload = await readJsonResponse(res)
+      } catch (parseErr) {
+        if (parseErr.message === "non-json-response") {
+          payload = await fetchOpenWeatherPayload(params, lang, controller.signal)
+        } else {
+          throw parseErr
+        }
+      }
+
+      if (!res.ok && !payload.current) {
+        if (payload.error) throw new Error(payload.error)
+        if (payload.current === undefined) {
+          payload = await fetchOpenWeatherPayload(params, lang, controller.signal)
+        }
+      }
+      if (!mountedRef.current || !generationGuard.current.isCurrent(generation)) return
+      const data = payload.current
       setWeatherData(data)
       if (data.name) localStorage.setItem("idle-weather-loc", data.name)
       if (data.coord) setCoords(data.coord)
 
-      // Fetch hourly forecast
-      const fUrl = forecastUrl || `https://api.openweathermap.org/data/2.5/forecast?lat=${data.coord.lat}&lon=${data.coord.lon}&appid=${API_KEY}&units=metric&lang=${lang}&cnt=8`
-      const fRes = await fetch(fUrl)
-      if (fRes.ok) {
-        const fData = await fRes.json()
-        setHourlyData(fData.list || [])
-      }
+      setHourlyData(payload.hourly || [])
     } catch (err) {
+      if (err.name === "AbortError") return
+      if (err.message === "weather-key-missing") {
+        setError(lang === "es" ? "Falta configurar NEXT_PUBLIC_WEATHER_API_KEY" : "NEXT_PUBLIC_WEATHER_API_KEY is not configured")
+        return
+      }
+      if (err.message === "weather-provider-error") {
+        setError(lang === "es" ? "No se pudo obtener el clima" : "Could not retrieve weather data")
+        return
+      }
+      if (!mountedRef.current || !generationGuard.current.isCurrent(generation)) return
       setError(err.message)
     } finally {
+      if (!mountedRef.current || requestRef.current !== controller || !generationGuard.current.isCurrent(generation)) return
       setLoading(false)
       setRefreshing(false)
     }
   }, [lang])
 
   const loadWeatherByLocation = useCallback(() => {
+    const generation = generationGuard.current.next()
     const savedLoc = localStorage.getItem("idle-weather-loc")
     if (navigator.geolocation && !savedLoc) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude: lat, longitude: lon } = position.coords
-          fetchWeather(
-            `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric&lang=${lang}`,
-          )
+          fetchWeather({ lat: String(lat), lon: String(lon) }, generation)
         },
         () => {
-          fetchWeather(`https://api.openweathermap.org/data/2.5/weather?q=Buenos Aires&appid=${API_KEY}&units=metric&lang=${lang}`)
+          fetchWeather({ q: "Buenos Aires" }, generation)
         }
       )
     } else {
       const query = savedLoc || "Buenos Aires"
-      fetchWeather(`https://api.openweathermap.org/data/2.5/weather?q=${query}&appid=${API_KEY}&units=metric&lang=${lang}`)
+      fetchWeather({ q: query }, generation)
     }
-  }, [fetchWeather, lang])
+  }, [fetchWeather])
 
+  useEffect(() => {
+    const guard = generationGuard.current
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      guard.invalidate()
+      requestRef.current?.abort()
+    }
+  }, [])
   useEffect(() => { loadWeatherByLocation() }, [loadWeatherByLocation])
 
   const handleRefresh = () => {
+    const generation = generationGuard.current.next()
     setRefreshing(true)
     if (coords) {
-      fetchWeather(
-        `https://api.openweathermap.org/data/2.5/weather?lat=${coords.lat}&lon=${coords.lon}&appid=${API_KEY}&units=metric&lang=${lang}`
-      )
+      fetchWeather({ lat: String(coords.lat), lon: String(coords.lon) }, generation)
     } else {
       loadWeatherByLocation()
     }
@@ -83,8 +158,9 @@ const WeatherWidget = ({ showLocation = true, showStats = true }) => {
   const handleSearch = (e) => {
     e.preventDefault()
     if (!searchQuery.trim()) return
+    const generation = generationGuard.current.next()
     setIsSearching(false)
-    fetchWeather(`https://api.openweathermap.org/data/2.5/weather?q=${searchQuery}&appid=${API_KEY}&units=metric&lang=${lang}`)
+    fetchWeather({ q: searchQuery.trim() }, generation)
     setSearchQuery("")
   }
 

@@ -9,6 +9,7 @@ import { useLanguage } from "@/lib/language-context"
 import { saveSettings } from "@/lib/settings-store"
 import { playChimeSound, playAlarmSound } from "@/components/hourly-chime"
 import { THEME_CONFIG, backgroundOptions } from "@/lib/themes"
+import { createBackup, restoreBackup } from "@/lib/storage"
 
 const widgetNames = {
   clock: "Clock", calendar: "Calendar", ambient: "Ambient",
@@ -129,15 +130,7 @@ export default function SettingsDrawer({
   }
 
   const handleExportData = () => {
-    const data = {
-      settings: localStorage.getItem("idle-settings"),
-      layout: localStorage.getItem("idle-widget-layout"),
-      pomodoro: localStorage.getItem('idle-pomodoros'),
-      pomodoroActivityModes: localStorage.getItem('pomodoroActivityModes'),
-      pomodoroActivities: localStorage.getItem('pomodoroActivities'),
-      youtube: localStorage.getItem('idle-youtube')
-    }
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })
+    const blob = new Blob([JSON.stringify(createBackup(), null, 2)], { type: "application/json" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url; a.download = "idle-backup.json"
@@ -151,13 +144,7 @@ export default function SettingsDrawer({
     const reader = new FileReader()
     reader.onload = (event) => {
       try {
-        const data = JSON.parse(event.target.result)
-        if (data.settings) localStorage.setItem("idle-settings", data.settings)
-        if (data.layout) localStorage.setItem("idle-widget-layout", data.layout)
-        if (data.pomodoro) localStorage.setItem("idle-pomodoros", data.pomodoro)
-        if (data.pomodoroActivityModes) localStorage.setItem("pomodoroActivityModes", data.pomodoroActivityModes)
-        if (data.pomodoroActivities) localStorage.setItem("pomodoroActivities", data.pomodoroActivities)
-        if (data.youtube) localStorage.setItem("idle-youtube", data.youtube)
+        if (!restoreBackup(JSON.parse(event.target.result))) throw new Error("Invalid backup")
         toast.success(t.toast?.importSuccess || "Datos importados")
         setTimeout(() => window.location.reload(), 1500)
       } catch { toast.error(t.toast?.importError || "Error al importar") }

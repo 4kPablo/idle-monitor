@@ -7,8 +7,8 @@ export const metadata = {
   description: "Tu pantalla secundaria perfecta",
   manifest: "/manifest.json",
   icons: {
-    icon: "/icon.jpg",
-    apple: "/icon.jpg",
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
   },
   openGraph: {
     title: "Idle Monitor",
@@ -51,7 +51,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="es" suppressHydrationWarning>
       <head>
-        <link rel="apple-touch-icon" href="/icon.jpg" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className={`font-sans antialiased`}>

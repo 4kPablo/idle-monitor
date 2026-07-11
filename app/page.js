@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import AnalogClock from "@/components/analog-clock"
 import MonthCalendar from "@/components/month-calendar"
 import WeatherWidget from "@/components/weather-widget"
 import TechNews from "@/components/tech-news"
@@ -24,6 +23,8 @@ import { getSettings, saveSettings } from "@/lib/settings-store"
 import { useLanguage } from "@/lib/language-context"
 import { Settings2, Check, X, Focus, Maximize, Minimize, EyeOff, LayoutTemplate, Volume2, VolumeX } from "lucide-react"
 import DigitalClockWidget from "@/components/digital-clock"
+import CentralClock from "@/components/central-clock"
+import { useWallClock } from "@/hooks/use-wall-clock"
 import { Toaster } from "@/components/ui/sonner"
 import { toast } from "sonner"
 import { THEME_CONFIG } from "@/lib/themes"
@@ -80,7 +81,7 @@ const AutoFitColumn = ({ id, items, children, isCustomizationMode, position }) =
     resizeObserver.observe(contentRef.current)
     checkScale()
     return () => resizeObserver.disconnect()
-  }, [children, isCustomizationMode])
+  }, [items, isCustomizationMode])
 
   return (
     <div
@@ -113,14 +114,24 @@ const FocusLauncherWidget = ({ onFocusToggle, label }) => (
 
 const EMPTY_PROPS = {}
 
+const HourlyChimeBoundary = (props) => {
+  const currentTime = useWallClock()
+  return <HourlyChime currentTime={currentTime} {...props} />
+}
+
+const CompactClock = () => {
+  const time = useWallClock()
+  return <>{String(time.getHours()).padStart(2, "0")}:{String(time.getMinutes()).padStart(2, "0")}</>
+}
+
 const widgetComponents = {
-  "clock": { component: DigitalClockWidget, props: (state) => ({ time: state.currentTime, showSeconds: state.widgetShowSeconds, clockStyle: state.widgetClockStyle, alarmSoundType: state.alarmSoundType, timerSoundType: state.timerSoundType }) },
-  "calendar": { component: MonthCalendar, props: (state) => ({ currentDate: state.currentTime, pomodoroRefresh: state.pomodoroRefresh }) },
+  "clock": { component: DigitalClockWidget, props: (state) => ({ showSeconds: state.widgetShowSeconds, clockStyle: state.widgetClockStyle, alarmSoundType: state.alarmSoundType, timerSoundType: state.timerSoundType }) },
+  "calendar": { component: MonthCalendar, props: (state) => ({ pomodoroRefresh: state.pomodoroRefresh }) },
   "ambient": { component: AmbientSounds, props: () => ({}) },
   "weather": { component: WeatherWidget, props: (state) => ({ showLocation: state.weatherShowLocation, showStats: state.weatherShowStats }) },
   "pomodoro": { component: PomodoroTimer, props: (state) => ({ onPomodoroComplete: state.handlePomodoroComplete, onFocusToggle: state.handleFocusToggle, onPomodoroActive: state.handlePomodoroActive, isFocusMode: state.isFocusMode }) },
   "tech-news": { component: TechNews, props: () => EMPTY_PROPS },
-  "progress-bars": { component: ProgressBars, props: (state) => ({ currentTime: state.currentTime }) },
+  "progress-bars": { component: ProgressBars, props: () => EMPTY_PROPS },
   "youtube": { component: YoutubeWidget, props: (state) => ({ 
     videoId: state.videoId, 
     setVideoId: state.setVideoId, 
@@ -138,7 +149,7 @@ const widgetComponents = {
 
 export default function HomePage() {
   const { lang, t, setLang } = useLanguage()
-  const [currentTime, setCurrentTime] = useState(new Date())
+  const coarseTime = useWallClock(60_000)
   const [pomodoroRefresh, setPomodoroRefresh] = useState(0)
   const [hourlyPulse, setHourlyPulse] = useState(false)
   const [layout, setLayout] = useState({ left: [], right: [] })
@@ -271,7 +282,7 @@ export default function HomePage() {
     }
   }, [])
 
-  const currentHour = currentTime.getHours()
+  const currentHour = coarseTime.getHours()
   const isNightMode = currentHour >= 0 && currentHour < 7
 
   useEffect(() => {
@@ -318,13 +329,6 @@ export default function HomePage() {
     if (savedTheme) {
       applyTheme(savedTheme, false) // false to avoid redundant save during load
     }
-  }, [])
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date())
-    }, 1000)
-    return () => clearInterval(timer)
   }, [])
 
   const handlePomodoroComplete = useCallback(() => {
@@ -391,22 +395,11 @@ export default function HomePage() {
 
 
 
-  const hours = currentTime.getHours().toString().padStart(2, "0")
-  const minutes = currentTime.getMinutes().toString().padStart(2, "0")
-  const seconds = currentTime.getSeconds().toString().padStart(2, "0")
-  const dateOptions = {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  }
-  const formattedDate = currentTime.toLocaleDateString(t.dateLocale, dateOptions)
-
   const cardClass = isNightMode
     ? "p-4 bg-black/60 backdrop-blur-sm border-border/50 transition-colors duration-500"
     : "p-4 bg-card/80 backdrop-blur-sm border-border transition-colors duration-500"
 
   const state = {
-    currentTime,
     pomodoroRefresh,
     handlePomodoroComplete,
     isFocusMode,
@@ -501,7 +494,7 @@ export default function HomePage() {
       <Toaster />
       <GlobalTimerIndicator />
       <div className="hidden"><AmbientSounds ref={ambientRef} /></div>
-      <HourlyChime currentTime={currentTime} enabled={chimeEnabled} silentFrom={chimeSilentFrom} silentTo={chimeSilentTo} soundType={chimeSoundType} onChime={handleHourlyChime} />
+      <HourlyChimeBoundary enabled={chimeEnabled} silentFrom={chimeSilentFrom} silentTo={chimeSilentTo} soundType={chimeSoundType} onChime={handleHourlyChime} />
 
       {/* Buttons to toggle Drawer and Sidebars */}
       {!isCustomizationMode && !isFullscreenViewport && !isFocusMode && (
@@ -600,7 +593,7 @@ export default function HomePage() {
                       <div className={`absolute top-4 right-4 z-[110] flex items-center gap-2 transition-opacity ${isFullscreenViewport ? "opacity-100 bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 shadow-2xl" : "opacity-0 group-hover:opacity-100"}`}>
                         {isFullscreenViewport && (
                            <div className="text-white/90 font-mono text-sm font-medium mr-2">
-                             {hours}:{minutes}
+                             <CompactClock />
                            </div>
                         )}
                         <button onClick={() => setIsFullscreenViewport(!isFullscreenViewport)} className="bg-black/50 hover:bg-black/80 text-white p-2 rounded-full backdrop-blur-sm transition-colors" title="Pantalla completa en ventana">
@@ -624,26 +617,7 @@ export default function HomePage() {
                 )}
 
                 {(!videoId || isVideoBackground) && centralClockType !== 'hidden' ? (
-                  <div className="text-center flex flex-col items-center">
-                    {centralClockType === 'analog' ? (
-                      <div className={`transition-all duration-500 mb-6 relative w-96 max-w-full ${hourlyPulse ? "scale-105" : ""}`}>
-                        <AnalogClock time={currentTime} hideSeconds={isFocusMode || !showSeconds} className="w-full" />
-                        {hourlyPulse && (
-                          <div className="absolute inset-0 rounded-full border-4 border-accent animate-ping opacity-50 z-[-1]" style={{ margin: '8%' }}></div>
-                        )}
-                      </div>
-                    ) : (
-                      <div
-                        className={`font-mono text-9xl font-bold tracking-tight mb-3 transition-all duration-500 flex items-baseline ${hourlyPulse ? "text-accent scale-105 drop-shadow-[0_0_30px_var(--accent)]" : "text-primary"} ${backgroundType === 'space' ? "text-stroke-2" : "text-shadow-sm"}`}
-                        style={backgroundType === 'space' ? { textShadow: '0 0 20px rgba(255,255,255,0.3), 0 0 40px rgba(255,255,255,0.2)', WebkitTextStroke: '2px rgba(255,255,255,0.3)' } : {}}
-                      >
-                        {hours}:{minutes}{showSeconds && <span className="text-4xl text-muted-foreground ml-2">:{seconds}</span>}
-                      </div>
-                    )}
-                    <div className={`text-2xl text-muted-foreground capitalize transition-all duration-300 ${backgroundType === 'space' ? "text-stroke-1 text-white/90" : "text-shadow-sm"}`}>
-                      {formattedDate}
-                    </div>
-                  </div>
+                  <CentralClock type={centralClockType} showSeconds={showSeconds} isFocusMode={isFocusMode} hourlyPulse={hourlyPulse} backgroundType={backgroundType} />
                 ) : null}
               </div>
 
@@ -676,7 +650,7 @@ export default function HomePage() {
         <div className={`absolute inset-0 w-full h-full flex flex-col items-center justify-center transition-opacity duration-500 ease-out ${isFocusMode ? "opacity-100 animate-slide-up" : "opacity-0 pointer-events-none"}`}>
           {/* Header — always slightly visible (opacity-20) to give a hint */}
           <div className={`absolute top-8 left-0 right-0 flex items-center justify-between px-8 transition-all duration-500 z-10 ${showUI ? "opacity-100" : "opacity-20"}`}>
-            <span className="text-sm font-mono text-muted-foreground/40">{hours}:{minutes}</span>
+            <span className="text-sm font-mono text-muted-foreground/40"><CompactClock /></span>
             <button
               onClick={() => setIsFocusMode(false)}
               className="text-xs text-muted-foreground/40 hover:text-foreground transition-colors"

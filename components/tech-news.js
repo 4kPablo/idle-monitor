@@ -10,17 +10,27 @@ const TechNews = () => {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [techNews, setTechNews] = useState([])
   const [loading, setLoading] = useState(false)
+  const abortRef = React.useRef(null)
 
   const fetchNews = useCallback(async () => {
+    if (document.hidden) return
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
     setLoading(true)
     try {
-      const topStoriesRes = await fetch("https://hacker-news.firebaseio.com/v0/topstories.json")
+      const cached = sessionStorage.getItem("idle-tech-news")
+      if (cached) {
+        const value = JSON.parse(cached)
+        if (Date.now() - value.savedAt < 15 * 60 * 1000) { setTechNews(value.stories); setLoading(false); return }
+      }
+      const topStoriesRes = await fetch("https://hacker-news.firebaseio.com/v0/topstories.json", { signal: controller.signal })
       const topStoryIds = await topStoriesRes.json()
-      const storyIds = topStoryIds.slice(0, 15)
+      const storyIds = topStoryIds.slice(0, 8)
 
       const stories = await Promise.all(
         storyIds.map(async (id) => {
-          const res = await fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`)
+          const res = await fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`, { signal: controller.signal })
           return res.json()
         })
       )
@@ -38,7 +48,9 @@ const TechNews = () => {
       })
 
       setTechNews(formattedNews)
+      sessionStorage.setItem("idle-tech-news", JSON.stringify({ savedAt: Date.now(), stories: formattedNews }))
     } catch (error) {
+      if (error.name === "AbortError") return
       console.error("Error fetching news:", error)
       setTechNews([{ title: t.techNews.loadError, url: "#", time: "", score: 0 }])
     }
@@ -47,8 +59,10 @@ const TechNews = () => {
 
   useEffect(() => {
     fetchNews()
-    const newsInterval = setInterval(fetchNews, 5 * 60 * 1000)
-    return () => clearInterval(newsInterval)
+    const newsInterval = setInterval(fetchNews, 15 * 60 * 1000)
+    const handleVisibility = () => { if (!document.hidden) fetchNews() }
+    document.addEventListener("visibilitychange", handleVisibility)
+    return () => { clearInterval(newsInterval); document.removeEventListener("visibilitychange", handleVisibility); abortRef.current?.abort() }
   }, [fetchNews])
 
   const goNext = () => {

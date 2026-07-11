@@ -1,8 +1,10 @@
 "use client"
 
 import { useLanguage } from "@/lib/language-context"
+import { useWallClock } from "@/hooks/use-wall-clock"
 
-export default function ProgressRings({ currentTime }) {
+export default function ProgressRings() {
+  const currentTime = useWallClock(60_000)
   const { t } = useLanguage()
   const hours = currentTime.getHours()
   const minutes = currentTime.getMinutes()
