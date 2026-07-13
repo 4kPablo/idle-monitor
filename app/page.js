@@ -18,7 +18,7 @@ import QuickLinks from "@/components/quick-links"
 import TaskList from "@/components/task-list"
 import AiNewsSummary from "@/components/ai-news-summary"
 import GlobalTimerIndicator from "@/components/global-timer-indicator"
-import { getWidgetLayout, saveWidgetLayout, moveWidget } from "@/lib/widget-store"
+import { finishWidgetDrag, getWidgetColumn, getWidgetLayout, previewWidgetDrag, saveWidgetLayout, moveWidget } from "@/lib/widget-store"
 import { getSettings, saveSettings } from "@/lib/settings-store"
 import { useLanguage } from "@/lib/language-context"
 import { Settings2, Check, X, Focus, Maximize, Minimize, EyeOff, LayoutTemplate, Volume2, VolumeX } from "lucide-react"
@@ -39,60 +39,21 @@ import {
   DragOverlay
 } from '@dnd-kit/core';
 import {
-  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { useDroppable } from '@dnd-kit/core';
-const AutoFitColumn = ({ id, items, children, isCustomizationMode, position }) => {
-  const containerRef = useRef(null)
-  const contentRef = useRef(null)
-  const [scale, setScale] = useState(1)
-
+const WidgetColumn = ({ id, items, children, isCustomizationMode }) => {
   const { setNodeRef } = useDroppable({ id })
-
-  const setRefs = useCallback(
-    (node) => {
-      containerRef.current = node;
-      setNodeRef(node);
-    },
-    [setNodeRef]
-  );
-
-  useEffect(() => {
-    if (!containerRef.current || !contentRef.current) return
-    const checkScale = () => {
-      if (isCustomizationMode) {
-        setScale(1)
-        return
-      }
-      const containerHeight = containerRef.current.clientHeight
-      const contentHeight = contentRef.current.scrollHeight
-      if (contentHeight > containerHeight && contentHeight > 0) {
-        setScale(containerHeight / contentHeight)
-      } else {
-        setScale(1)
-      }
-    }
-
-    const resizeObserver = new ResizeObserver(checkScale)
-    resizeObserver.observe(containerRef.current)
-    resizeObserver.observe(contentRef.current)
-    checkScale()
-    return () => resizeObserver.disconnect()
-  }, [items, isCustomizationMode])
 
   return (
     <div
-      ref={setRefs}
-      className={`flex-shrink-0 h-[80vh] flex flex-col justify-center transition-all duration-700 ${isCustomizationMode ? "border-2 border-dashed border-primary/20 rounded-xl p-2 bg-primary/5" : ""}`}
-      style={{ width: '19rem' }}
+      ref={setNodeRef}
+      className={`w-full min-w-0 rounded-xl ${isCustomizationMode ? "border-2 border-dashed border-primary/20 p-2 bg-primary/5" : ""}`}
     >
       <div
-        ref={contentRef}
-        className={`w-full space-y-4 flex flex-col transition-transform duration-300 ${position === 'left' ? 'origin-left' : 'origin-right'}`}
-        style={{ transform: scale < 1 ? `scale(${scale})` : 'none' }}
+        className="w-full space-y-4 flex flex-col"
       >
         <SortableContext items={items} strategy={verticalListSortingStrategy}>
           {children}
@@ -103,13 +64,15 @@ const AutoFitColumn = ({ id, items, children, isCustomizationMode, position }) =
 }
 
 const FocusLauncherWidget = ({ onFocusToggle, label }) => (
-  <div
+  <button
+    type="button"
     onClick={onFocusToggle}
-    className="flex flex-row items-center justify-center p-3 gap-2 h-full cursor-pointer group rounded-xl border border-transparent hover:border-primary/20 hover:bg-primary/5 transition-all duration-300"
+    className="flex w-full min-h-11 flex-row items-center justify-center p-3 gap-2 h-full cursor-pointer group rounded-xl border border-transparent hover:border-primary/20 hover:bg-primary/5 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+    aria-label={label}
   >
     <Focus className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors opacity-50 group-hover:opacity-100" />
     <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">{label}</span>
-  </div>
+  </button>
 )
 
 const EMPTY_PROPS = {}
@@ -148,7 +111,7 @@ const widgetComponents = {
 }
 
 export default function HomePage() {
-  const { lang, t, setLang } = useLanguage()
+  const { t } = useLanguage()
   const coarseTime = useWallClock(60_000)
   const [pomodoroRefresh, setPomodoroRefresh] = useState(0)
   const [hourlyPulse, setHourlyPulse] = useState(false)
@@ -186,6 +149,8 @@ export default function HomePage() {
   const [youtubePlaylistExpanded, setYoutubePlaylistExpanded] = useState(false)
 
   const ambientRef = useRef(null)
+  const dragOriginRef = useRef(null)
+  const dragLayoutRef = useRef(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -200,6 +165,8 @@ export default function HomePage() {
 
   const handleDragStart = (event) => {
     setDraggingWidget(event.active.id);
+    dragOriginRef.current = getWidgetColumn(layout, event.active.id);
+    dragLayoutRef.current = layout;
   };
 
   const handleDragOver = (event) => {
@@ -211,69 +178,38 @@ export default function HomePage() {
 
     if (activeId === overId) return;
 
-    const activeContainer = layout.left.includes(activeId) ? "left" : "right";
-    const overContainer = layout.left.includes(overId) ? "left" : layout.right.includes(overId) ? "right" : overId;
-
-    if (!activeContainer || !overContainer || activeContainer === overContainer) {
-      return;
-    }
-
-    setLayout((prev) => {
-      const activeItems = prev[activeContainer];
-      const overItems = prev[overContainer];
-      const activeIndex = activeItems.indexOf(activeId);
-      const overIndex = overItems.indexOf(overId);
-
-      let newIndex;
-      if (overId in prev) { // dropped on empty column
-        newIndex = overItems.length + 1;
-      } else {
-        const isBelowOverItem = over && active.rect.current.translated && active.rect.current.translated.top > over.rect.top + over.rect.height;
-        const modifier = isBelowOverItem ? 1 : 0;
-        newIndex = overIndex >= 0 ? overIndex + modifier : overItems.length + 1;
-      }
-
-      return {
-        ...prev,
-        [activeContainer]: activeItems.filter((item) => item !== activeId),
-        [overContainer]: [
-          ...overItems.slice(0, newIndex),
-          activeItems[activeIndex],
-          ...overItems.slice(newIndex, overItems.length),
-        ],
-      };
-    });
+    const placeAfter = Boolean(active.rect.current.translated && active.rect.current.translated.top > over.rect.top + over.rect.height);
+    setLayout((prev) => previewWidgetDrag(prev, activeId, overId, placeAfter, dragOriginRef.current));
   };
 
   const handleDragEnd = (event) => {
     const { active, over } = event;
     setDraggingWidget(null);
-    if (!over) return;
+    if (!over) {
+      setLayout((prev) => finishWidgetDrag({ layout: prev, snapshot: dragLayoutRef.current, activeId: active.id, overId: null, originColumn: dragOriginRef.current }))
+      dragOriginRef.current = null
+      dragLayoutRef.current = null
+      return;
+    }
 
     const activeId = active.id;
     const overId = over.id;
 
-    const activeContainer = layout.left.includes(activeId) ? "left" : "right";
-    const overContainer = layout.left.includes(overId) ? "left" : layout.right.includes(overId) ? "right" : overId;
-
-    if (activeContainer && overContainer && activeContainer === overContainer) {
-      const activeIndex = layout[activeContainer].indexOf(activeId);
-      const overIndex = layout[overContainer].indexOf(overId);
-
-      if (activeIndex !== overIndex) {
-        const newLayout = {
-          ...layout,
-          [overContainer]: arrayMove(layout[overContainer], activeIndex, overIndex),
-        };
-        setLayout(newLayout);
-        saveWidgetLayout(newLayout);
-      } else {
-        saveWidgetLayout(layout);
-      }
-    } else {
-       saveWidgetLayout(layout);
-    }
+    setLayout((prev) => {
+      const next = finishWidgetDrag({ layout: prev, snapshot: dragLayoutRef.current, activeId, overId, originColumn: dragOriginRef.current });
+      saveWidgetLayout(next);
+      dragOriginRef.current = null;
+      dragLayoutRef.current = null;
+      return next;
+    });
   };
+
+  const handleDragCancel = () => {
+    setDraggingWidget(null)
+    setLayout((prev) => finishWidgetDrag({ layout: prev, snapshot: dragLayoutRef.current, activeId: draggingWidget, overId: null, originColumn: dragOriginRef.current, cancelled: true }))
+    dragOriginRef.current = null
+    dragLayoutRef.current = null
+  }
 
   const setVideoId = useCallback((id) => {
     setVideoIdState(id)
@@ -373,6 +309,21 @@ export default function HomePage() {
     saveWidgetLayout(newLayout)
   }, [layout])
 
+  const handleMoveWidget = useCallback((widgetId, direction) => {
+    setLayout((prev) => {
+      const column = prev.left.includes(widgetId) ? "left" : prev.right.includes(widgetId) ? "right" : null
+      if (!column) return prev
+      const index = prev[column].indexOf(widgetId)
+      const targetColumn = direction === "across" ? (column === "left" ? "right" : "left") : column
+      const targetIndex = direction === "up" ? index - 1 : direction === "down" ? index + 1 : prev[targetColumn].length
+      const next = moveWidget(widgetId, column, targetColumn, prev, targetIndex)
+      if (next.left.join() === prev.left.join() && next.right.join() === prev.right.join()) return prev
+      saveWidgetLayout(next)
+      toast.success(t.widgetActions.moved.replace("{widget}", t.widgets[widgetId]))
+      return next
+    })
+  }, [t])
+
   const applyTheme = (theme, shouldSave = true) => {
     document.documentElement.style.setProperty('--primary', theme.primary)
     document.documentElement.style.setProperty('--accent', theme.accent)
@@ -429,6 +380,9 @@ export default function HomePage() {
 
     const isHidden = !isOverlay && youtubePlaylistExpanded && widgetId !== 'youtube' && layout[column].includes('youtube');
     const finalCardClass = `${cardClass} ${isHidden ? "hidden" : ""}`;
+    const widgetName = t.widgets[widgetId] || widgetId
+    const canMoveUp = index > 0
+    const canMoveDown = index < layout[column].length - 1
 
     if (widgetId === 'pomodoro') {
       return (
@@ -437,6 +391,11 @@ export default function HomePage() {
           id={widgetId}
           cardClass={finalCardClass}
           isDraggable={isCustomizationMode}
+          onMove={isCustomizationMode ? handleMoveWidget : undefined}
+          widgetName={widgetName}
+          actionLabels={t.widgetActions}
+          canMoveUp={canMoveUp}
+          canMoveDown={canMoveDown}
           animationDelay={100 + index * 50}
           isOverlay={isOverlay}
         >
@@ -455,6 +414,11 @@ export default function HomePage() {
         cardClass={finalCardClass}
         onRemove={isCustomizationMode ? handleRemoveWidget : undefined}
         isDraggable={isCustomizationMode}
+        onMove={isCustomizationMode ? handleMoveWidget : undefined}
+        widgetName={widgetName}
+        actionLabels={t.widgetActions}
+        canMoveUp={canMoveUp}
+        canMoveDown={canMoveDown}
         animationDelay={100 + index * 50}
         isOverlay={isOverlay}
       >
@@ -485,7 +449,7 @@ export default function HomePage() {
 
   return (
     <div
-      className={`h-screen overflow-hidden w-full flex flex-col items-center justify-center relative transition-colors duration-1000 ${isNightMode ? "bg-black" : "animated-bg"}`}
+      className={`h-screen overflow-hidden w-full flex flex-col items-center justify-center relative transition-colors duration-1000 motion-reduce:transition-none ${isNightMode ? "bg-black" : "animated-bg"}`}
       style={backgroundType === 'solid' ? { backgroundColor: customBgColor } : backgroundType === 'particles' ? { backgroundColor: particleBgColor } : {}}
       onMouseMove={() => setShowUI(true)}
       onMouseLeave={() => setShowUI(false)}
@@ -498,18 +462,21 @@ export default function HomePage() {
 
       {/* Buttons to toggle Drawer and Sidebars */}
       {!isCustomizationMode && !isFullscreenViewport && !isFocusMode && (
-        <div className={`absolute top-6 right-6 flex items-center gap-4 transition-all duration-500 z-50 ${showUI ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4 pointer-events-none"}`}>
+        <div className={`absolute top-4 right-4 md:top-6 md:right-6 flex items-center gap-2 md:gap-4 transition-all duration-500 motion-reduce:transition-none z-50 focus-within:opacity-100 focus-within:translate-y-0 ${showUI ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4 hover:opacity-100 hover:translate-y-0"}`}>
           <button
             onClick={() => setHideSidebars(!hideSidebars)}
-            className="px-4 py-2 bg-card/80 backdrop-blur-md border border-border rounded-full shadow-lg hover:scale-105 transition-transform group flex items-center justify-center"
+            className="size-11 bg-card/80 backdrop-blur-md border border-border rounded-full shadow-lg hover:scale-105 transition-transform motion-reduce:transition-none group flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             title={hideSidebars ? t.settings.showSidebars : t.settings.hideSidebars}
+            aria-label={hideSidebars ? t.settings.showSidebars : t.settings.hideSidebars}
+            aria-pressed={hideSidebars}
           >
             {hideSidebars ? <LayoutTemplate className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" /> : <EyeOff className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />}
           </button>
           <button
             onClick={() => setIsDrawerOpen(true)}
-            className="px-4 py-2 bg-card/80 backdrop-blur-md border border-border rounded-full shadow-lg hover:scale-105 transition-transform group flex items-center justify-center"
+            className="size-11 bg-card/80 backdrop-blur-md border border-border rounded-full shadow-lg hover:scale-105 transition-transform motion-reduce:transition-none group flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             title={t.settings.settingsTitle}
+            aria-label={t.settings.settingsTitle}
           >
             <Settings2 className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
           </button>
@@ -520,7 +487,7 @@ export default function HomePage() {
       {isCustomizationMode && (
         <button
           onClick={() => setIsCustomizationMode(false)}
-          className="absolute top-6 right-6 px-4 py-2 bg-primary text-primary-foreground backdrop-blur-md border border-border rounded-full shadow-lg hover:scale-105 transition-transform z-50 group flex items-center gap-2"
+          className="absolute top-4 right-4 md:top-6 md:right-6 min-h-11 px-4 py-2 bg-primary text-primary-foreground backdrop-blur-md border border-border rounded-full shadow-lg hover:scale-105 transition-transform motion-reduce:transition-none z-50 group flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           title={t.settings.finishEditing}
         >
           <Check className="w-5 h-5" /> {t.settings.finishEditing}
@@ -552,9 +519,9 @@ export default function HomePage() {
         handleAddWidget={handleAddWidget}
       />
 
-      <div className={`w-full relative z-10 h-full flex transition-transform duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] ${isCustomizationMode ? "scale-95" : ""}`}>
+      <div className="w-full relative z-10 h-full flex">
         {/* === MODO NORMAL === */}
-        <div className={`absolute inset-0 w-full h-full flex flex-col items-center justify-center transition-all duration-700 ease-out ${isFocusMode ? "opacity-0 scale-[0.97] pointer-events-none" : "opacity-100 scale-100"}`}>
+        <div className={`absolute inset-0 w-full h-full overflow-y-auto xl:overflow-hidden flex flex-col items-center transition-all duration-700 motion-reduce:transition-none ease-out ${isFocusMode ? "opacity-0 scale-[0.97] pointer-events-none" : "opacity-100 scale-100"}`}>
           {/* Main Content Area */}
           <DndContext
             sensors={sensors}
@@ -562,24 +529,24 @@ export default function HomePage() {
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
+            onDragCancel={handleDragCancel}
           >
-            <div className={`relative z-10 w-full h-full flex items-center justify-center pointer-events-none p-8`}>
-              <div className={`w-full flex gap-4 h-full pt-24 pb-8 transition-all duration-700 pointer-events-auto ${videoId && !isVideoBackground ? "max-w-[1800px] px-4" : "max-w-[1400px] px-8"}`}>
+            <div className="relative z-10 w-full min-h-full xl:h-full pointer-events-none px-4 md:px-8">
+              <div className={`mx-auto w-full grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[minmax(17rem,19rem)_minmax(0,1fr)_minmax(17rem,19rem)] gap-4 min-h-full pt-24 pb-8 pointer-events-auto ${videoId && !isVideoBackground ? "max-w-[1800px]" : "max-w-[1400px]"}`}>
 
               {/* Columna izquierda */}
-              <div className={`transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${hideSidebars ? "-translate-x-[150%] opacity-0 pointer-events-none" : "translate-x-0 opacity-100"}`}>
-                <AutoFitColumn
+              <div className={`order-2 md:order-2 xl:order-none xl:col-start-1 xl:row-start-1 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto xl:pr-1 transition-all duration-700 motion-reduce:transition-none ease-[cubic-bezier(0.34,1.56,0.64,1)] ${hideSidebars ? "hidden xl:block xl:-translate-x-[150%] xl:opacity-0 xl:pointer-events-none" : "translate-x-0 opacity-100"}`}>
+                <WidgetColumn
                   id="left"
                   items={layout.left}
                   isCustomizationMode={isCustomizationMode}
-                  position="left"
                 >
                   {layout.left.map((widgetId, index) => renderWidget(widgetId, index, "left"))}
-                </AutoFitColumn>
+                </WidgetColumn>
               </div>
 
               {/* Centro - Reloj principal / Youtube */}
-              <div className="flex-1 flex flex-col items-center justify-center">
+              <div className="order-1 md:col-span-2 xl:order-none xl:col-span-1 xl:col-start-2 xl:row-start-1 min-h-[45vh] xl:min-h-0 flex flex-col items-center justify-center">
 
                 {videoId && (
                   <div className={
@@ -622,15 +589,14 @@ export default function HomePage() {
               </div>
 
               {/* Columna derecha */}
-              <div className={`transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${hideSidebars ? "translate-x-[150%] opacity-0 pointer-events-none" : "translate-x-0 opacity-100"} ${isCustomizationMode ? "min-w-[280px]" : ""}`}>
-                <AutoFitColumn
+              <div className={`order-3 md:order-3 xl:order-none xl:col-start-3 xl:row-start-1 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto xl:pl-1 transition-all duration-700 motion-reduce:transition-none ease-[cubic-bezier(0.34,1.56,0.64,1)] ${hideSidebars ? "hidden xl:block xl:translate-x-[150%] xl:opacity-0 xl:pointer-events-none" : "translate-x-0 opacity-100"}`}>
+                <WidgetColumn
                   id="right"
                   items={layout.right}
                   isCustomizationMode={isCustomizationMode}
-                  position="right"
                 >
                   {layout.right.map((widgetId, index) => renderWidget(widgetId, index, "right"))}
-                </AutoFitColumn>
+                </WidgetColumn>
               </div>
 
             </div>
